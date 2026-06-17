@@ -60,12 +60,12 @@
 
 ## 11. tt serve subcommand（cmd/tt/serve_cmd.go）
 
-- [ ] 11.1 建立 `cmd/tt/serve_cmd.go`，定義 `serveCmd *cobra.Command`，flags：`--port int`（預設 7890）、`--since string`（預設 `7d`，與 report 一致）
-- [ ] 11.2 在 `serveCmd.RunE` 中：解析 `--since`、建立 HTTP mux（`http.NewServeMux()`）、掛 `GET /` → `HandleDashboard`、`GET /api/report` → `HandleAPIReport`
-- [ ] 11.3 印出 `Serving at http://localhost:<port>` 後呼叫 `openBrowser("http://localhost:<port>")`
-- [ ] 11.4 呼叫 `http.ListenAndServe`；若 err != nil 印出含 port 號的錯誤並 `return err`
-- [ ] 11.5 實作 `openBrowser(url string)` 函式：`switch runtime.GOOS { case "darwin": exec.Command("open", url) case "linux": exec.Command("xdg-open", url) default: exec.Command("cmd", "/c", "start", url) }`，啟動後不等待（`cmd.Start()`）
-- [ ] 11.6 在 `cmd/tt/main.go`（或 root command 初始化處）將 `serveCmd` 加入 root command
+- [x] 11.1 建立 `cmd/tt/serve_cmd.go`，定義 `serveCmd *cobra.Command`，flags：`--port int`（預設 7890）、`--since string`（預設 `7d`，與 report 一致）
+- [x] 11.2 在 `serveCmd.RunE` 中：解析 `--since`、建立 HTTP mux（`http.NewServeMux()`）、掛 `GET /` → `HandleDashboard`、`GET /api/report` → `HandleAPIReport`
+- [x] 11.3 印出 `Serving at http://localhost:<port>` 後呼叫 `openBrowser("http://localhost:<port>")`
+- [x] 11.4 呼叫 `http.ListenAndServe`；若 err != nil 印出含 port 號的錯誤並 `return err`
+- [x] 11.5 實作 `openBrowser(url string)` 函式：`switch runtime.GOOS { case "darwin": exec.Command("open", url) case "linux": exec.Command("xdg-open", url) default: exec.Command("cmd", "/c", "start", url) }`，啟動後不等待（`cmd.Start()`）
+- [x] 11.6 在 `cmd/tt/main.go`（或 root command 初始化處）將 `serveCmd` 加入 root command
 
 ## 12. 驗收測試
 
