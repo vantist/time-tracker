@@ -319,6 +319,119 @@ func TestQueryDailyBreakdown(t *testing.T) {
 	}
 }
 
+// Task 18.1: ProjectSummary.UserActiveTimeSec computed correctly
+func TestProjectSummaryUserActiveTime(t *testing.T) {
+	conn := openTestDB(t)
+
+	base := time.Date(2026, 6, 18, 9, 0, 0, 0, time.UTC)
+	insertSession(t, conn, "proj-ua1", "/proj/a", "main", "")
+	// Two turns 5 minutes apart (< 15m idle threshold) → user active time > 0
+	t1 := base
+	t2 := base.Add(5 * time.Minute)
+	ra1 := t1.Add(30 * time.Second)
+	ra2 := t2.Add(30 * time.Second)
+	insertTurnFull(t, conn, "proj-ua1", t1, &ra1, 100, 50, 0, 0, nil)
+	insertTurnFull(t, conn, "proj-ua1", t2, &ra2, 100, 50, 0, 0, nil)
+
+	result, err := report.Query(conn, report.Options{Since: base.Add(-time.Hour)})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(result.ByProject) == 0 {
+		t.Fatal("ByProject empty")
+	}
+	if result.ByProject[0].UserActiveTimeSec <= 0 {
+		t.Errorf("ProjectSummary.UserActiveTimeSec = %d, want > 0", result.ByProject[0].UserActiveTimeSec)
+	}
+}
+
+// Task 18.2: SessionRow.WorkItem correctly returned
+func TestSessionRowWorkItem(t *testing.T) {
+	conn := openTestDB(t)
+
+	base := time.Date(2026, 6, 18, 10, 0, 0, 0, time.UTC)
+	insertSession(t, conn, "wi-sess", "/proj", "main", "my-feature")
+	ra := base.Add(time.Minute)
+	insertTurnFull(t, conn, "wi-sess", base, &ra, 100, 50, 0, 0, nil)
+
+	result, err := report.Query(conn, report.Options{Since: base.Add(-time.Hour)})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(result.Sessions) == 0 {
+		t.Fatal("Sessions empty")
+	}
+	if result.Sessions[0].WorkItem != "my-feature" {
+		t.Errorf("SessionRow.WorkItem = %q, want my-feature", result.Sessions[0].WorkItem)
+	}
+}
+
+// Task 18.3: SessionRow.UserTimeSec computed correctly
+func TestSessionRowUserTimeSec(t *testing.T) {
+	conn := openTestDB(t)
+
+	base := time.Date(2026, 6, 18, 11, 0, 0, 0, time.UTC)
+	insertSession(t, conn, "user-time-sess", "/proj", "main", "")
+	t1 := base
+	t2 := base.Add(3 * time.Minute)
+	ra1 := t1.Add(30 * time.Second)
+	ra2 := t2.Add(30 * time.Second)
+	insertTurnFull(t, conn, "user-time-sess", t1, &ra1, 100, 50, 0, 0, nil)
+	insertTurnFull(t, conn, "user-time-sess", t2, &ra2, 100, 50, 0, 0, nil)
+
+	result, err := report.Query(conn, report.Options{Since: base.Add(-time.Hour)})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if len(result.Sessions) == 0 {
+		t.Fatal("Sessions empty")
+	}
+	if result.Sessions[0].UserTimeSec <= 0 {
+		t.Errorf("SessionRow.UserTimeSec = %d, want > 0", result.Sessions[0].UserTimeSec)
+	}
+}
+
+// Task 18.4: Result.Groups always non-nil even when ByWorkItem=false
+func TestGroupsAlwaysPopulated(t *testing.T) {
+	conn := openTestDB(t)
+
+	base := time.Date(2026, 6, 18, 12, 0, 0, 0, time.UTC)
+	insertSession(t, conn, "grp-sess", "/proj", "main", "")
+	ra := base.Add(time.Minute)
+	insertTurnFull(t, conn, "grp-sess", base, &ra, 100, 50, 0, 0, nil)
+
+	result, err := report.Query(conn, report.Options{Since: base.Add(-time.Hour), ByWorkItem: false})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	if result.Groups == nil {
+		t.Error("Result.Groups should not be nil even when ByWorkItem=false")
+	}
+}
+
+// Task 18.5: FormatJSON output contains "groups" array
+func TestFormatJSONContainsGroups(t *testing.T) {
+	conn := openTestDB(t)
+
+	base := time.Date(2026, 6, 18, 13, 0, 0, 0, time.UTC)
+	insertSession(t, conn, "grp-json", "/proj", "main", "")
+	ra := base.Add(time.Minute)
+	insertTurnFull(t, conn, "grp-json", base, &ra, 100, 50, 0, 0, nil)
+
+	result, err := report.Query(conn, report.Options{Since: base.Add(-time.Hour)})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+	out := report.FormatJSON(result)
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("invalid JSON: %v", err)
+	}
+	if _, ok := m["groups"]; !ok {
+		t.Error("FormatJSON missing 'groups' key")
+	}
+}
+
 // Task 6.1: FormatJSON includes cache_creation_tokens, cache_read_tokens, by_project
 func TestFormatJSONNewFields(t *testing.T) {
 	costVal := 0.05

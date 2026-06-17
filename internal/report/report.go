@@ -19,6 +19,19 @@ type Options struct {
 	ByWorkItem bool
 }
 
+type SessionRow struct {
+	ID           string   `json:"id"`
+	Project      string   `json:"project"`
+	Branch       string   `json:"branch"`
+	Model        string   `json:"model"`
+	StartedAt    string   `json:"started_at"`
+	WorkItem     string   `json:"work_item"`
+	Turns        int      `json:"turns"`
+	AgentTimeSec int64    `json:"agent_time_sec"`
+	UserTimeSec  int64    `json:"user_time_sec"`
+	CostUSD      *float64 `json:"cost_usd"`
+}
+
 type Result struct {
 	Empty                bool
 	SessionsCount        int
@@ -29,16 +42,18 @@ type Result struct {
 	CacheReadTokens      int64
 	CacheCreationTokens  int64
 	EstimatedCostUSD     *float64
-	Groups               []GroupResult    // populated when ByWorkItem=true
+	Groups               []GroupResult    // always populated, sorted by AgentTimeSec desc
 	ByProject            []ProjectSummary // grouped by session.project
 	Daily                []DailyStat      // last 7 days
+	Sessions             []SessionRow     // all sessions in range, newest first
 }
 
 type ProjectSummary struct {
-	Project       string   `json:"project"`
-	SessionsCount int      `json:"sessions"`
-	AgentTimeSec  int64    `json:"agent_time_seconds"`
-	CostUSD       *float64 `json:"cost_usd"`
+	Project            string   `json:"project"`
+	SessionsCount      int      `json:"sessions"`
+	AgentTimeSec       int64    `json:"agent_time_seconds"`
+	UserActiveTimeSec  int64    `json:"user_active_time_sec"`
+	CostUSD            *float64 `json:"cost_usd"`
 }
 
 type DailyStat struct {
@@ -49,11 +64,11 @@ type DailyStat struct {
 }
 
 type GroupResult struct {
-	Label             string
-	SessionsCount     int
-	AgentTimeSec      int64
-	UserActiveTimeSec int64
-	EstimatedCostUSD  *float64
+	Label             string   `json:"label"`
+	SessionsCount     int      `json:"sessions_count"`
+	AgentTimeSec      int64    `json:"agent_time_sec"`
+	UserActiveTimeSec int64    `json:"user_active_time_sec"`
+	EstimatedCostUSD  *float64 `json:"estimated_cost_usd"`
 }
 
 func Query(conn *sql.DB, opts Options) (Result, error) {
@@ -73,6 +88,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 
 	rows, err := conn.Query(`
 		SELECT s.id, s.project, s.branch, s.work_item,
+		       COALESCE(s.model, ''), s.started_at,
 		       t.prompt_at, t.response_at,
 		       COALESCE(t.input_tokens, 0),
 		       COALESCE(t.output_tokens, 0),
@@ -97,15 +113,18 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		var r rowData
 		var promptStr, responseStr sql.NullString
 		var wi sql.NullString
+		var startedAt sql.NullString
 
 		if err := rows.Scan(
 			&r.sessionID, &r.project, &r.branch, &wi,
+			&r.model, &startedAt,
 			&promptStr, &responseStr,
 			&r.inputTok, &r.outputTok, &r.cacheRead, &r.cacheCreate, &r.cost,
 		); err != nil {
 			return Result{}, err
 		}
 		r.workItem = wi.String
+		r.startedAt = startedAt.String
 		if promptStr.Valid {
 			r.promptAt, _ = time.Parse(time.RFC3339, promptStr.String)
 		}
@@ -127,6 +146,17 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 
 	// build Turn slices per session for time aggregation
 	sessTurns := map[string][]aggregator.Turn{}
+	// session metadata keyed by sessionID
+	type sessState struct {
+		project   string
+		branch    string
+		model     string
+		startedAt string
+		workItem  string
+		turns     int
+		cost      *float64
+	}
+	sessMap := map[string]*sessState{}
 	// project → {sessions, agent turns, cost}
 	type projState struct {
 		sessions map[string]struct{}
@@ -152,6 +182,21 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 				res.EstimatedCostUSD = &v
 			}
 			*res.EstimatedCostUSD += *r.cost
+		}
+
+		// per-session accumulation
+		ss := sessMap[r.sessionID]
+		if ss == nil {
+			ss = &sessState{project: r.project, branch: r.branch, model: r.model, startedAt: r.startedAt, workItem: r.workItem}
+			sessMap[r.sessionID] = ss
+		}
+		ss.turns++
+		if r.cost != nil {
+			if ss.cost == nil {
+				v := 0.0
+				ss.cost = &v
+			}
+			*ss.cost += *r.cost
 		}
 
 		// by-project accumulation
@@ -202,22 +247,43 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	res.AgentTimeSec = int64(totalAgent.Seconds())
 	res.UserActiveTimeSec = int64(totalUser.Seconds())
 
-	if opts.ByWorkItem {
-		res.Groups = groupByWorkItem(allRows, sessTurns, idleThreshold)
-	}
+	res.Groups = groupByWorkItem(allRows, sessTurns, idleThreshold)
 
 	// build ByProject sorted by sessions desc
 	for proj, ps := range projMap {
 		agentSec := int64(aggregator.AgentTime(ps.turns).Seconds())
+		userSec := int64(aggregator.UserActiveTime(ps.turns, idleThreshold).Seconds())
 		res.ByProject = append(res.ByProject, ProjectSummary{
-			Project:       proj,
-			SessionsCount: len(ps.sessions),
-			AgentTimeSec:  agentSec,
-			CostUSD:       ps.cost,
+			Project:           proj,
+			SessionsCount:     len(ps.sessions),
+			AgentTimeSec:      agentSec,
+			UserActiveTimeSec: userSec,
+			CostUSD:           ps.cost,
 		})
 	}
 	sort.Slice(res.ByProject, func(i, j int) bool {
 		return res.ByProject[i].SessionsCount > res.ByProject[j].SessionsCount
+	})
+
+	// build Sessions sorted by started_at desc
+	for sid, ss := range sessMap {
+		agentSec := int64(aggregator.AgentTime(sessTurns[sid]).Seconds())
+		userSec := int64(aggregator.UserActiveTime(sessTurns[sid], idleThreshold).Seconds())
+		res.Sessions = append(res.Sessions, SessionRow{
+			ID:           sid,
+			Project:      ss.project,
+			Branch:       ss.branch,
+			Model:        ss.model,
+			StartedAt:    ss.startedAt,
+			WorkItem:     ss.workItem,
+			Turns:        ss.turns,
+			AgentTimeSec: agentSec,
+			UserTimeSec:  userSec,
+			CostUSD:      ss.cost,
+		})
+	}
+	sort.Slice(res.Sessions, func(i, j int) bool {
+		return res.Sessions[i].StartedAt > res.Sessions[j].StartedAt
 	})
 
 	// build Daily sorted by date asc
@@ -235,6 +301,8 @@ type rowData struct {
 	sessionID   string
 	project     string
 	branch      string
+	model       string
+	startedAt   string
 	workItem    string
 	promptAt    time.Time
 	responseAt  *time.Time
@@ -300,6 +368,9 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 			EstimatedCostUSD:  g.cost,
 		})
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].AgentTimeSec > result[j].AgentTimeSec
+	})
 	return result
 }
 
@@ -384,6 +455,8 @@ func FormatJSON(r Result) string {
 		"estimated_cost_usd":    r.EstimatedCostUSD,
 		"by_project":            r.ByProject,
 		"daily":                 r.Daily,
+		"sessions":              r.Sessions,
+		"groups":                r.Groups,
 	}
 	b, _ := json.Marshal(m)
 	return string(b)
