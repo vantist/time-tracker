@@ -1,6 +1,11 @@
 package pricing
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
+
+var dateSuffix = regexp.MustCompile(`-\d{8}$`)
 
 type modelPricing struct {
 	input         float64
@@ -23,9 +28,9 @@ var table = map[string]modelPricing{
 
 func normalize(model string) string {
 	if i := strings.LastIndex(model, "/"); i >= 0 {
-		return model[i+1:]
+		model = model[i+1:]
 	}
-	return model
+	return dateSuffix.ReplaceAllString(model, "")
 }
 
 // Calculate returns estimated cost in USD, or nil for unknown models.

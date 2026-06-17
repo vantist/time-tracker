@@ -65,6 +65,18 @@ func TestCalculateOpus48NewPricing(t *testing.T) {
 	}
 }
 
+// Date-suffix stripping: claude-haiku-4-5-20251001 should resolve to claude-haiku-4-5
+func TestCalculateDateSuffix(t *testing.T) {
+	got := pricing.Calculate("claude-haiku-4-5-20251001", 1_000_000, 0, 0, 0)
+	if got == nil {
+		t.Fatal("expected non-nil cost for claude-haiku-4-5-20251001 (date suffix should be stripped)")
+	}
+	const want = 1.00
+	if *got < want-0.001 || *got > want+0.001 {
+		t.Errorf("cost = %f, want ~%f", *got, want)
+	}
+}
+
 // Task 16.4: unknown model after normalize returns nil
 func TestCalculateUnknownAfterNormalize(t *testing.T) {
 	got := pricing.Calculate("vertex_ai/gpt-5-unknown", 1000, 0, 0, 0)

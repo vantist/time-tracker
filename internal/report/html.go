@@ -85,6 +85,9 @@ function fmtTime(sec) {
   return h > 0 ? h+'h '+m+'m' : m+'m';
 }
 function fmtCost(c) { return c == null ? 'N/A' : '$'+c.toFixed(4); }
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 function render(d) {
   document.getElementById('v-sessions').textContent = d.sessions_count || 0;
@@ -117,7 +120,7 @@ function render(d) {
   projBody.innerHTML = '';
   (d.by_project||[]).forEach(function(p) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+p.project+'</td><td>'+p.sessions+'</td><td>'+fmtTime(p.agent_time_seconds||0)+'</td><td>'+fmtTime(p.user_active_time_sec||0)+'</td><td>'+(p.input_tokens||0)+'</td><td>'+fmtCost(p.cost_usd)+'</td>';
+    tr.innerHTML = '<td>'+esc(p.project)+'</td><td>'+p.sessions+'</td><td>'+fmtTime(p.agent_time_seconds||0)+'</td><td>'+fmtTime(p.user_active_time_sec||0)+'</td><td>'+(p.input_tokens||0)+'</td><td>'+fmtCost(p.cost_usd)+'</td>';
     projBody.appendChild(tr);
   });
 
@@ -129,7 +132,7 @@ function render(d) {
   wiBody.innerHTML = '';
   groups.forEach(function(g) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+(g.label||'')+'</td><td>'+(g.sessions_count||0)+'</td><td>'+fmtTime(g.agent_time_sec||0)+'</td><td>'+fmtTime(g.user_active_time_sec||0)+'</td><td>'+fmtCost(g.estimated_cost_usd)+'</td>';
+    tr.innerHTML = '<td>'+esc(g.label)+'</td><td>'+(g.sessions_count||0)+'</td><td>'+fmtTime(g.agent_time_sec||0)+'</td><td>'+fmtTime(g.user_active_time_sec||0)+'</td><td>'+fmtCost(g.estimated_cost_usd)+'</td>';
     wiBody.appendChild(tr);
   });
 
@@ -139,7 +142,7 @@ function render(d) {
   (d.sessions||[]).forEach(function(s) {
     const tr = document.createElement('tr');
     const t = new Date(s.started_at||0);
-    tr.innerHTML = '<td>'+t.toLocaleString()+'</td><td>'+(s.project||'')+'</td><td>'+(s.branch||'')+'</td><td>'+(s.model||'')+'</td><td>'+(s.turns||0)+'</td><td>'+fmtTime(s.agent_time_sec||0)+'</td><td>'+fmtTime(s.user_time_sec||0)+'</td><td>'+(s.work_item||'')+'</td><td>'+fmtCost(s.cost_usd)+'</td>';
+    tr.innerHTML = '<td>'+t.toLocaleString()+'</td><td>'+esc(s.project)+'</td><td>'+esc(s.branch)+'</td><td>'+esc(s.model)+'</td><td>'+(s.turns||0)+'</td><td>'+fmtTime(s.agent_time_sec||0)+'</td><td>'+fmtTime(s.user_time_sec||0)+'</td><td>'+esc(s.work_item)+'</td><td>'+fmtCost(s.cost_usd)+'</td>';
     sessBody.appendChild(tr);
   });
 

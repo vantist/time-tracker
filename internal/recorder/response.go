@@ -21,11 +21,11 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
 	var tok tokenPayload
 	if tokensJSON != "" {
 		// Try flat format; fall back to nested {"usage": {...}}
-		if err := json.Unmarshal([]byte(tokensJSON), &tok); err != nil || tok.InputTokens == 0 {
+		if err := json.Unmarshal([]byte(tokensJSON), &tok); err != nil || (tok.InputTokens == 0 && tok.OutputTokens == 0 && tok.CacheReadTokens == 0 && tok.CacheCreationTokens == 0) {
 			var nested struct {
 				Usage tokenPayload `json:"usage"`
 			}
-			if err2 := json.Unmarshal([]byte(tokensJSON), &nested); err2 == nil && nested.Usage.InputTokens > 0 {
+			if err2 := json.Unmarshal([]byte(tokensJSON), &nested); err2 == nil && (nested.Usage.InputTokens > 0 || nested.Usage.OutputTokens > 0 || nested.Usage.CacheReadTokens > 0 || nested.Usage.CacheCreationTokens > 0) {
 				tok = nested.Usage
 			}
 		}
