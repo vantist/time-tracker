@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/vantist/time-checker/compare/v1.0.0...v1.1.0) (2026-06-17)
+
+
+### Features
+
+* **github-cicd-release:** 建立 GitHub CI/CD 發布流程 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+* **hook-integration:** 新增 Claude Code 與 Copilot CLI hooks 設定及事件處理 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+* **report-query:** 新增報表查詢功能 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+* **session-management:** 新增 session 與 turn 資料模型 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+* **time-aggregation:** 新增時間聚合計算邏輯 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+* **work-item-tagging:** 新增工作項目標記管理 ([fa75195](https://github.com/vantist/time-checker/commit/fa7519504e2f23449b7905c2aad44a0b66ec6654))
+
 ## 1.0.0 (2026-06-17)
 
 
