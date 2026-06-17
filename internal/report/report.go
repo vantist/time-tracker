@@ -207,17 +207,6 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	}
 
 	// build ByProject sorted by sessions desc
-	for _, ps := range projMap {
-		agentSec := int64(aggregator.AgentTime(ps.turns).Seconds())
-		res.ByProject = append(res.ByProject, ProjectSummary{
-			Project:      "",
-			SessionsCount: len(ps.sessions),
-			AgentTimeSec:  agentSec,
-			CostUSD:       ps.cost,
-		})
-	}
-	// fix Project field (need key from projMap)
-	res.ByProject = res.ByProject[:0]
 	for proj, ps := range projMap {
 		agentSec := int64(aggregator.AgentTime(ps.turns).Seconds())
 		res.ByProject = append(res.ByProject, ProjectSummary{
