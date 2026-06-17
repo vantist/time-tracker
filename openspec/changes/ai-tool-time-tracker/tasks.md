@@ -9,15 +9,15 @@
 
 - [x] 2.1 **[TDD]** 寫 `internal/db/schema_test.go`：測試首次執行自動建立 `sessions` 和 `turns` 表，使用 `TT_DB_PATH` 環境變數指向 temp 檔
 - [x] 2.2 實作 `internal/db/schema.go`：建立 `sessions`、`turns` 表（`CREATE TABLE IF NOT EXISTS`），讀取 `TT_DB_PATH` 環境變數覆蓋預設路徑 `~/.tt/data.db`，通過 2.1 測試
-- [ ] 2.3 **[TDD]** 寫測試：session upsert 保留 `started_at`（INSERT OR IGNORE 語義）
-- [ ] 2.4 實作 session upsert 邏輯，通過 2.3 測試
+- [x] 2.3 **[TDD]** 寫測試：session upsert 保留 `started_at`（INSERT OR IGNORE 語義）
+- [x] 2.4 實作 session upsert 邏輯，通過 2.3 測試
 
 ## 3. 事件記錄（`tt record`）
 
-- [ ] 3.1 **[TDD]** 寫 `internal/recorder/recorder_test.go`：測試 `RecordPrompt` — 首次建立 session + turn，`prompt_at` 正確，git branch 自動偵測（mock git 或使用 fixture）
-- [ ] 3.2 實作 `internal/recorder/recorder.go`：`RecordPrompt(sessionID, project, tool, model string)`，含 git branch 偵測，通過 3.1 測試
-- [ ] 3.3 **[TDD]** 寫測試：`RecordPrompt` 同 session 第二次不重建 session
-- [ ] 3.4 通過 3.3 測試
+- [x] 3.1 **[TDD]** 寫 `internal/recorder/recorder_test.go`：測試 `RecordPrompt` — 首次建立 session + turn，`prompt_at` 正確，git branch 自動偵測（mock git 或使用 fixture）
+- [x] 3.2 實作 `internal/recorder/recorder.go`：`RecordPrompt(sessionID, project, tool, model string)`，含 git branch 偵測，通過 3.1 測試
+- [x] 3.3 **[TDD]** 寫測試：`RecordPrompt` 同 session 第二次不重建 session
+- [x] 3.4 通過 3.3 測試
 - [ ] 3.5 **[TDD]** 寫 `internal/recorder/recorder_test.go`：測試 `RecordResponse` — 更新最新 turn 的 `response_at`、token 欄位、`estimated_cost_usd`；token JSON 扁平格式與巢狀格式兩種
 - [ ] 3.6 實作 `RecordResponse(sessionID string, tokensJSON string)`，解析 token JSON（含容錯），呼叫定價計算，通過 3.5 測試
 - [ ] 3.7 **[TDD]** 寫測試：hook 呼叫失敗（SQLite 鎖定模擬）時 `RecordPrompt`/`RecordResponse` 回傳 nil error（不 panic）
