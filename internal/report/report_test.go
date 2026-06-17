@@ -139,7 +139,7 @@ func TestFormatText(t *testing.T) {
 		EstimatedCostUSD:  ptr(0.042),
 	}
 	text := report.FormatText(r)
-	for _, want := range []string{"Sessions:", "Agent time:", "User active:", "Tokens in:", "Est. cost:"} {
+	for _, want := range []string{"Sessions:", "Agent time:", "User active:", "─── Tokens", "Est. cost:"} {
 		if !strings.Contains(text, want) {
 			t.Errorf("text output missing %q", want)
 		}
@@ -209,6 +209,64 @@ func TestQueryByProjectNilCost(t *testing.T) {
 	}
 	if result.ByProject[0].CostUSD != nil {
 		t.Errorf("CostUSD should be nil, got %v", result.ByProject[0].CostUSD)
+	}
+}
+
+// Task 4.1: FormatText contains Tokens block
+func TestFormatTextTokensBlock(t *testing.T) {
+	r := report.Result{
+		SessionsCount:       1,
+		AgentTimeSec:        60,
+		InputTokens:         1000,
+		OutputTokens:        500,
+		CacheReadTokens:     200,
+		CacheCreationTokens: 100,
+		EstimatedCostUSD:    ptr(0.01),
+	}
+	text := report.FormatText(r)
+	for _, want := range []string{"─── Tokens", "Input:", "Output:", "Cache read:", "Cache create:"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing %q\ngot:\n%s", want, text)
+		}
+	}
+	// check comma-formatted numbers
+	if !strings.Contains(text, "1,000") {
+		t.Errorf("FormatText: Input tokens should be comma-formatted, got:\n%s", text)
+	}
+}
+
+// Task 4.2: FormatText contains By Project block
+func TestFormatTextByProject(t *testing.T) {
+	costVal := 0.05
+	r := report.Result{
+		SessionsCount: 1,
+		ByProject: []report.ProjectSummary{
+			{Project: "myproj", SessionsCount: 2, AgentTimeSec: 3600, CostUSD: &costVal},
+		},
+	}
+	text := report.FormatText(r)
+	if !strings.Contains(text, "─── By Project") {
+		t.Errorf("FormatText missing By Project block:\n%s", text)
+	}
+	if !strings.Contains(text, "myproj") {
+		t.Errorf("FormatText missing project name:\n%s", text)
+	}
+	if !strings.Contains(text, "$0.0500") {
+		t.Errorf("FormatText missing cost:\n%s", text)
+	}
+}
+
+// Task 4.3: project CostUSD nil → "N/A"
+func TestFormatTextByProjectNoCost(t *testing.T) {
+	r := report.Result{
+		SessionsCount: 1,
+		ByProject: []report.ProjectSummary{
+			{Project: "nocost", SessionsCount: 1, AgentTimeSec: 120, CostUSD: nil},
+		},
+	}
+	text := report.FormatText(r)
+	if !strings.Contains(text, "N/A") {
+		t.Errorf("FormatText: nil CostUSD should show N/A:\n%s", text)
 	}
 }
 

@@ -314,6 +314,26 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 	return result
 }
 
+func formatInt(n int64) string {
+	s := strconv.FormatInt(n, 10)
+	if n < 0 {
+		s = s[1:]
+	}
+	var out []byte
+	for i, c := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out = append(out, ',')
+		}
+		out = append(out, byte(c))
+	}
+	if n < 0 {
+		return "-" + string(out)
+	}
+	return string(out)
+}
+
+const separator = "─────────────────────────────────────────"
+
 func FormatText(r Result) string {
 	if r.Empty {
 		return "No data for the selected period.\n"
@@ -333,8 +353,33 @@ func FormatText(r Result) string {
 	fmt.Fprintf(&b, "Sessions:    %d\n", r.SessionsCount)
 	fmt.Fprintf(&b, "Agent time:  %dh %dm\n", agentH, agentM)
 	fmt.Fprintf(&b, "User active: %dh %dm\n", userH, userM)
-	fmt.Fprintf(&b, "Tokens in:   %d\n", r.InputTokens)
-	fmt.Fprintf(&b, "Est. cost:   %s\n", cost)
+
+	// Tokens block
+	fmt.Fprintf(&b, "─── Tokens %s\n", separator[:30])
+	fmt.Fprintf(&b, "  Input:        %s\n", formatInt(r.InputTokens))
+	fmt.Fprintf(&b, "  Output:       %s\n", formatInt(r.OutputTokens))
+	fmt.Fprintf(&b, "  Cache read:   %s\n", formatInt(r.CacheReadTokens))
+	fmt.Fprintf(&b, "  Cache create: %s\n", formatInt(r.CacheCreationTokens))
+
+	// Cost block
+	fmt.Fprintf(&b, "─── Cost %s\n", separator[:32])
+	fmt.Fprintf(&b, "  Est. cost:  %s\n", cost)
+
+	// By Project block
+	if len(r.ByProject) > 0 {
+		fmt.Fprintf(&b, "─── By Project %s\n", separator[:26])
+		for _, p := range r.ByProject {
+			ph := p.AgentTimeSec / 3600
+			pm := (p.AgentTimeSec % 3600) / 60
+			pcost := "N/A"
+			if p.CostUSD != nil {
+				pcost = fmt.Sprintf("$%.4f", *p.CostUSD)
+			}
+			fmt.Fprintf(&b, "  %-30s  %3d sessions  %dh %dm  %s\n",
+				p.Project, p.SessionsCount, ph, pm, pcost)
+		}
+	}
+
 	return b.String()
 }
 

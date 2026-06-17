@@ -15,15 +15,15 @@
 
 ## 3. FormatText 改版
 
-- [ ] 3.1 在 `internal/report/report.go` 的 `FormatText` 函式，加入 Tokens 區塊（`─── Tokens ─────...`），依序顯示 Input、Output、Cache read、Cache create，數字用 `humanize` 或 `fmt.Sprintf("%s", formatInt(n))` 千分位格式（先看現有格式方式，沿用已有 helper；若無則實作 `formatInt(n int64) string` 用 `strconv` + 手動插逗號）
-- [ ] 3.2 在 FormatText 加入 Cost 區塊（`─── Cost ────...`），顯示 Est. cost 行
-- [ ] 3.3 在 FormatText 加入 By Project 區塊（`─── By Project ──...`），每個 ProjectSummary 各一行，格式 `  <project>  <sessions>  <agentH>h <agentM>m  <cost|N/A>`，欄寬對齊
+- [x] 3.1 在 `internal/report/report.go` 的 `FormatText` 函式，加入 Tokens 區塊（`─── Tokens ─────...`），依序顯示 Input、Output、Cache read、Cache create，數字用 `humanize` 或 `fmt.Sprintf("%s", formatInt(n))` 千分位格式（先看現有格式方式，沿用已有 helper；若無則實作 `formatInt(n int64) string` 用 `strconv` + 手動插逗號）
+- [x] 3.2 在 FormatText 加入 Cost 區塊（`─── Cost ────...`），顯示 Est. cost 行
+- [x] 3.3 在 FormatText 加入 By Project 區塊（`─── By Project ──...`），每個 ProjectSummary 各一行，格式 `  <project>  <sessions>  <agentH>h <agentM>m  <cost|N/A>`，欄寬對齊
 
 ## 4. 測試：FormatText（TDD，先寫測試）
 
-- [ ] 4.1 在 `internal/report/report_test.go` 加入測試：FormatText 輸出含 `─── Tokens` 行，且 Input/Output/Cache read/Cache create 值正確
-- [ ] 4.2 在 `internal/report/report_test.go` 加入測試：FormatText 輸出含 `─── By Project` 行，project 名稱與 cost 正確
-- [ ] 4.3 在 `internal/report/report_test.go` 加入測試：project CostUSD 為 nil 時顯示 `N/A`
+- [x] 4.1 在 `internal/report/report_test.go` 加入測試：FormatText 輸出含 `─── Tokens` 行，且 Input/Output/Cache read/Cache create 值正確
+- [x] 4.2 在 `internal/report/report_test.go` 加入測試：FormatText 輸出含 `─── By Project` 行，project 名稱與 cost 正確
+- [x] 4.3 在 `internal/report/report_test.go` 加入測試：project CostUSD 為 nil 時顯示 `N/A`
 
 ## 5. FormatJSON 補齊欄位
 
