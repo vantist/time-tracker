@@ -18,11 +18,11 @@
 - [x] 3.2 實作 `internal/recorder/recorder.go`：`RecordPrompt(sessionID, project, tool, model string)`，含 git branch 偵測，通過 3.1 測試
 - [x] 3.3 **[TDD]** 寫測試：`RecordPrompt` 同 session 第二次不重建 session
 - [x] 3.4 通過 3.3 測試
-- [ ] 3.5 **[TDD]** 寫 `internal/recorder/recorder_test.go`：測試 `RecordResponse` — 更新最新 turn 的 `response_at`、token 欄位、`estimated_cost_usd`；token JSON 扁平格式與巢狀格式兩種
-- [ ] 3.6 實作 `RecordResponse(sessionID string, tokensJSON string)`，解析 token JSON（含容錯），呼叫定價計算，通過 3.5 測試
-- [ ] 3.7 **[TDD]** 寫測試：hook 呼叫失敗（SQLite 鎖定模擬）時 `RecordPrompt`/`RecordResponse` 回傳 nil error（不 panic）
-- [ ] 3.8 實作錯誤靜默處理（stderr 輸出，exit code 0），通過 3.7 測試
-- [ ] 3.9 在 cobra 中加入 `tt record prompt` 和 `tt record response` 子命令，接受所有 flag，呼叫 recorder
+- [x] 3.5 **[TDD]** 寫 `internal/recorder/recorder_test.go`：測試 `RecordResponse` — 更新最新 turn 的 `response_at`、token 欄位、`estimated_cost_usd`；token JSON 扁平格式與巢狀格式兩種
+- [x] 3.6 實作 `RecordResponse(sessionID string, tokensJSON string)`，解析 token JSON（含容錯），呼叫定價計算，通過 3.5 測試
+- [x] 3.7 **[TDD]** 寫測試：hook 呼叫失敗（SQLite 鎖定模擬）時 `RecordPrompt`/`RecordResponse` 回傳 nil error（不 panic）
+- [x] 3.8 實作錯誤靜默處理（stderr 輸出，exit code 0），通過 3.7 測試
+- [x] 3.9 在 cobra 中加入 `tt record prompt` 和 `tt record response` 子命令，接受所有 flag，呼叫 recorder
 
 ## 4. 定價計算（`internal/pricing`）
 
