@@ -12,10 +12,12 @@ import (
 )
 
 type PromptInput struct {
-	SessionID string
-	Project   string
-	Tool      string
-	Model     string
+	SessionID    string
+	Project      string
+	Tool         string
+	Model        string
+	ProcessPID   int64
+	ProcessStart int64
 }
 
 func RecordPrompt(conn *sql.DB, input PromptInput) error {
@@ -25,13 +27,16 @@ func RecordPrompt(conn *sql.DB, input PromptInput) error {
 	wi, _ := workitem.Get()
 
 	if err := db.UpsertSession(conn, db.Session{
-		ID:        input.SessionID,
-		Project:   input.Project,
-		Tool:      input.Tool,
-		Model:     input.Model,
-		Branch:    branch,
-		WorkItem:  wi,
-		StartedAt: now,
+		ID:             input.SessionID,
+		Project:        input.Project,
+		Tool:           input.Tool,
+		Model:          input.Model,
+		Branch:         branch,
+		WorkItem:       wi,
+		StartedAt:      now,
+		ProcessPID:     input.ProcessPID,
+		ProcessStart:   input.ProcessStart,
+		ConversationID: input.SessionID,
 	}); err != nil {
 		return fmt.Errorf("upsert session: %w", err)
 	}

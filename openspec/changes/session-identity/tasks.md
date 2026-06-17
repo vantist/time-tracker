@@ -14,9 +14,9 @@
 
 ## 3. Recorder 層更新
 
-- [ ] 3.1 在 `internal/recorder/recorder.go` 的 `PromptInput` struct 新增 `ProcessPID int64`、`ProcessStart int64`
-- [ ] 3.2 修改 `RecordPrompt`：從 `PromptInput` 取得 `ProcessPID`、`ProcessStart`，傳入 `db.UpsertSession`；`turns` 的 `session_id` 仍使用 `input.SessionID`（conversation-level）
-- [ ] 3.3 撰寫測試：`TestRecordPrompt_StableSession`，確認同一 `(ProcessPID, ProcessStart)` 不同 `SessionID` 的兩次呼叫僅產生一個 session、兩個 turn
+- [x] 3.1 在 `internal/recorder/recorder.go` 的 `PromptInput` struct 新增 `ProcessPID int64`、`ProcessStart int64`
+- [x] 3.2 修改 `RecordPrompt`：從 `PromptInput` 取得 `ProcessPID`、`ProcessStart`，傳入 `db.UpsertSession`；`turns` 的 `session_id` 仍使用 `input.SessionID`（conversation-level）
+- [x] 3.3 撰寫測試：`TestRecordPrompt_StableSession`，確認同一 `(ProcessPID, ProcessStart)` 不同 `SessionID` 的兩次呼叫僅產生一個 session、兩個 turn
 
 ## 4. CLI `tt record prompt` 讀取 env var
 
