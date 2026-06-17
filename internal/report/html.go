@@ -55,15 +55,23 @@ tr:hover td { background: #1a2234; }
 <div class="section">
   <h2>By Project</h2>
   <table>
-    <thead><tr><th>Project</th><th>Sessions</th><th>Agent time</th><th>Tokens</th><th>Cost</th></tr></thead>
+    <thead><tr><th>Project</th><th>Sessions</th><th>Agent time</th><th>User time</th><th>Tokens</th><th>Cost</th></tr></thead>
     <tbody id="tbl-project"></tbody>
+  </table>
+</div>
+
+<div class="section" id="section-workitem">
+  <h2>By Work Item</h2>
+  <table>
+    <thead><tr><th>Label</th><th>Sessions</th><th>Agent time</th><th>User time</th><th>Cost</th></tr></thead>
+    <tbody id="tbl-workitem"></tbody>
   </table>
 </div>
 
 <div class="section">
   <h2>Sessions</h2>
   <table>
-    <thead><tr><th>Time</th><th>Project</th><th>Branch</th><th>Model</th><th>Turns</th><th>Agent time</th><th>Cost</th></tr></thead>
+    <thead><tr><th>Time</th><th>Project</th><th>Branch</th><th>Model</th><th>Turns</th><th>Agent time</th><th>User time</th><th>Work item</th><th>Cost</th></tr></thead>
     <tbody id="tbl-sessions"></tbody>
   </table>
 </div>
@@ -109,8 +117,20 @@ function render(d) {
   projBody.innerHTML = '';
   (d.by_project||[]).forEach(function(p) {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+p.project+'</td><td>'+p.sessions+'</td><td>'+fmtTime(p.agent_time_seconds||0)+'</td><td>'+(p.input_tokens||0)+'</td><td>'+fmtCost(p.cost_usd)+'</td>';
+    tr.innerHTML = '<td>'+p.project+'</td><td>'+p.sessions+'</td><td>'+fmtTime(p.agent_time_seconds||0)+'</td><td>'+fmtTime(p.user_active_time_sec||0)+'</td><td>'+(p.input_tokens||0)+'</td><td>'+fmtCost(p.cost_usd)+'</td>';
     projBody.appendChild(tr);
+  });
+
+  // by-work-item table
+  const groups = d.groups || [];
+  const wiSection = document.getElementById('section-workitem');
+  wiSection.style.display = groups.length <= 1 ? 'none' : '';
+  const wiBody = document.getElementById('tbl-workitem');
+  wiBody.innerHTML = '';
+  groups.forEach(function(g) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+(g.label||'')+'</td><td>'+(g.sessions_count||0)+'</td><td>'+fmtTime(g.agent_time_sec||0)+'</td><td>'+fmtTime(g.user_active_time_sec||0)+'</td><td>'+fmtCost(g.estimated_cost_usd)+'</td>';
+    wiBody.appendChild(tr);
   });
 
   // sessions table
@@ -119,7 +139,7 @@ function render(d) {
   (d.sessions||[]).forEach(function(s) {
     const tr = document.createElement('tr');
     const t = new Date(s.started_at||0);
-    tr.innerHTML = '<td>'+t.toLocaleString()+'</td><td>'+(s.project||'')+'</td><td>'+(s.branch||'')+'</td><td>'+(s.model||'')+'</td><td>'+(s.turns||0)+'</td><td>'+fmtTime(s.agent_time_sec||0)+'</td><td>'+fmtCost(s.cost_usd)+'</td>';
+    tr.innerHTML = '<td>'+t.toLocaleString()+'</td><td>'+(s.project||'')+'</td><td>'+(s.branch||'')+'</td><td>'+(s.model||'')+'</td><td>'+(s.turns||0)+'</td><td>'+fmtTime(s.agent_time_sec||0)+'</td><td>'+fmtTime(s.user_time_sec||0)+'</td><td>'+(s.work_item||'')+'</td><td>'+fmtCost(s.cost_usd)+'</td>';
     sessBody.appendChild(tr);
   });
 
