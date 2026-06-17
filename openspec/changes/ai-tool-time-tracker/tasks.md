@@ -40,16 +40,16 @@
 
 ## 6. 時間聚合與報表（`tt report`）
 
-- [ ] 6.1 **[TDD]** 寫 `internal/aggregator/aggregator_test.go`：測試 agent 時間計算（3 turns，第 3 個 response_at 為 NULL，預期 45 秒）
-- [ ] 6.2 實作 `internal/aggregator/aggregator.go`：`AgentTime(turns []Turn) time.Duration`，通過 6.1 測試
-- [ ] 6.3 **[TDD]** 寫測試：user 主動時間計算 — gap < threshold 計入，gap ≥ threshold 不計入，idle_threshold 可設定
-- [ ] 6.4 實作 `UserActiveTime(turns []Turn, idleThreshold time.Duration) time.Duration`，通過 6.3 測試
-- [ ] 6.5 **[TDD]** 寫 `internal/report/report_test.go`：測試 `--since 7d` 篩選（turns 在範圍內/外）；`--project` 篩選；無資料時輸出 "No data for the selected period."
-- [ ] 6.6 實作 `internal/report/report.go`：查詢 SQLite，組裝聚合結果，通過 6.5 測試
-- [ ] 6.7 實作 text 格式輸出（含 Sessions, Agent time, User active, Tokens in, Est. cost 欄位）
-- [ ] 6.8 實作 `--format json` 輸出（含所有必要欄位，可被 `jq` 解析）
-- [ ] 6.9 實作 `--by-work-item` 分組報表（`work_item ?? branch ?? "untagged"` 優先順序）
-- [ ] 6.10 在 cobra 中加入 `tt report` 子命令，接受 `--project`, `--since`, `--format`, `--by-work-item` flags
+- [x] 6.1 **[TDD]** 寫 `internal/aggregator/aggregator_test.go`：測試 agent 時間計算（3 turns，第 3 個 response_at 為 NULL，預期 45 秒）
+- [x] 6.2 實作 `internal/aggregator/aggregator.go`：`AgentTime(turns []Turn) time.Duration`，通過 6.1 測試
+- [x] 6.3 **[TDD]** 寫測試：user 主動時間計算 — gap < threshold 計入，gap ≥ threshold 不計入，idle_threshold 可設定
+- [x] 6.4 實作 `UserActiveTime(turns []Turn, idleThreshold time.Duration) time.Duration`，通過 6.3 測試
+- [x] 6.5 **[TDD]** 寫 `internal/report/report_test.go`：測試 `--since 7d` 篩選（turns 在範圍內/外）；`--project` 篩選；無資料時輸出 "No data for the selected period."
+- [x] 6.6 實作 `internal/report/report.go`：查詢 SQLite，組裝聚合結果，通過 6.5 測試
+- [x] 6.7 實作 text 格式輸出（含 Sessions, Agent time, User active, Tokens in, Est. cost 欄位）
+- [x] 6.8 實作 `--format json` 輸出（含所有必要欄位，可被 `jq` 解析）
+- [x] 6.9 實作 `--by-work-item` 分組報表（`work_item ?? branch ?? "untagged"` 優先順序）
+- [x] 6.10 在 cobra 中加入 `tt report` 子命令，接受 `--project`, `--since`, `--format`, `--by-work-item` flags
 
 ## 7. 設定管理（`tt config`）
 
