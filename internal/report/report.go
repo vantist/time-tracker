@@ -35,17 +35,17 @@ type Result struct {
 }
 
 type ProjectSummary struct {
-	Project      string
-	SessionsCount int
-	AgentTimeSec int64
-	CostUSD      *float64
+	Project       string   `json:"project"`
+	SessionsCount int      `json:"sessions"`
+	AgentTimeSec  int64    `json:"agent_time_seconds"`
+	CostUSD       *float64 `json:"cost_usd"`
 }
 
 type DailyStat struct {
-	Date         string
-	Sessions     int
-	InputTokens  int64
-	OutputTokens int64
+	Date         string `json:"date"`
+	Sessions     int    `json:"sessions"`
+	InputTokens  int64  `json:"input_tokens"`
+	OutputTokens int64  `json:"output_tokens"`
 }
 
 type GroupResult struct {
@@ -385,12 +385,16 @@ func FormatText(r Result) string {
 
 func FormatJSON(r Result) string {
 	m := map[string]interface{}{
-		"sessions_count":       r.SessionsCount,
-		"agent_time_sec":       r.AgentTimeSec,
-		"user_active_time_sec": r.UserActiveTimeSec,
-		"input_tokens":         r.InputTokens,
-		"output_tokens":        r.OutputTokens,
-		"estimated_cost_usd":   r.EstimatedCostUSD,
+		"sessions_count":        r.SessionsCount,
+		"agent_time_sec":        r.AgentTimeSec,
+		"user_active_time_sec":  r.UserActiveTimeSec,
+		"input_tokens":          r.InputTokens,
+		"output_tokens":         r.OutputTokens,
+		"cache_read_tokens":     r.CacheReadTokens,
+		"cache_creation_tokens": r.CacheCreationTokens,
+		"estimated_cost_usd":    r.EstimatedCostUSD,
+		"by_project":            r.ByProject,
+		"daily":                 r.Daily,
 	}
 	b, _ := json.Marshal(m)
 	return string(b)

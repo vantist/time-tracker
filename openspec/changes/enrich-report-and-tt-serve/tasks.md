@@ -27,11 +27,11 @@
 
 ## 5. FormatJSON 補齊欄位
 
-- [ ] 5.1 在 `internal/report/report.go` 的 `FormatJSON` 函式，map 中加入 `"cache_creation_tokens": r.CacheCreationTokens`、`"cache_read_tokens": r.CacheReadTokens`、`"by_project": r.ByProject`
+- [x] 5.1 在 `internal/report/report.go` 的 `FormatJSON` 函式，map 中加入 `"cache_creation_tokens": r.CacheCreationTokens`、`"cache_read_tokens": r.CacheReadTokens`、`"by_project": r.ByProject`
 
 ## 6. 測試：FormatJSON（TDD，先寫測試）
 
-- [ ] 6.1 在 `internal/report/report_test.go` 加入測試：FormatJSON 輸出 JSON 含 `cache_creation_tokens`、`cache_read_tokens`、`by_project` 陣列
+- [x] 6.1 在 `internal/report/report_test.go` 加入測試：FormatJSON 輸出 JSON 含 `cache_creation_tokens`、`cache_read_tokens`、`by_project` 陣列
 
 ## 7. Daily breakdown 後處理
 

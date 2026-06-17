@@ -291,3 +291,36 @@ func TestFormatJSON(t *testing.T) {
 		}
 	}
 }
+
+// Task 6.1: FormatJSON includes cache_creation_tokens, cache_read_tokens, by_project
+func TestFormatJSONNewFields(t *testing.T) {
+	costVal := 0.05
+	r := report.Result{
+		SessionsCount:       2,
+		InputTokens:         100,
+		OutputTokens:        50,
+		CacheReadTokens:     30,
+		CacheCreationTokens: 10,
+		EstimatedCostUSD:    ptr(0.002),
+		ByProject: []report.ProjectSummary{
+			{Project: "p1", SessionsCount: 2, AgentTimeSec: 120, CostUSD: &costVal},
+		},
+		Daily: []report.DailyStat{
+			{Date: "2026-06-18", Sessions: 2, InputTokens: 100, OutputTokens: 50},
+		},
+	}
+	out := report.FormatJSON(r)
+	var m map[string]interface{}
+	if err := json.Unmarshal([]byte(out), &m); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, out)
+	}
+	for _, key := range []string{"cache_creation_tokens", "cache_read_tokens", "by_project", "daily"} {
+		if _, ok := m[key]; !ok {
+			t.Errorf("JSON missing key %q", key)
+		}
+	}
+	bp, ok := m["by_project"].([]interface{})
+	if !ok || len(bp) != 1 {
+		t.Errorf("by_project should be array of 1, got: %v", m["by_project"])
+	}
+}
