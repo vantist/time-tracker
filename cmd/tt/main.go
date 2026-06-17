@@ -12,6 +12,10 @@ var rootCmd = &cobra.Command{
 	Short: "AI tool time tracker",
 }
 
+func init() {
+	rootCmd.AddCommand(versionCmd)
+}
+
 func main() {
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
