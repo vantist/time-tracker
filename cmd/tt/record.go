@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/user/tt/internal/db"
+	"github.com/user/tt/internal/process"
 	"github.com/user/tt/internal/recorder"
 )
 
@@ -103,35 +104,35 @@ func readStdinJSON() (*hookPayload, error) {
 	return &p, nil
 }
 
-// resolvePromptInputFromEnv reads PROCESS_PID and PROCESS_START env vars.
-// If PROCESS_START is missing or invalid, ProcessStart is set to 0 (triggers
-// UpsertSession degraded mode) and a warning is printed to stderr.
+// resolvePromptInputFromEnv resolves ProcessPID and ProcessStart.
+// Priority: PROCESS_PID + PROCESS_START env vars (both non-empty) → override.
+// Otherwise: os.Getppid() + process.StartTime(ppid).
 func resolvePromptInputFromEnv() (recorder.PromptInput, error) {
-	var out recorder.PromptInput
+	pidEnv := os.Getenv("PROCESS_PID")
+	startEnv := os.Getenv("PROCESS_START")
 
-	if v := os.Getenv("PROCESS_PID"); v != "" {
-		pid, err := strconv.ParseInt(v, 10, 64)
-		if err == nil {
+	if pidEnv != "" && startEnv != "" {
+		var out recorder.PromptInput
+		if pid, err := strconv.ParseInt(pidEnv, 10, 64); err == nil {
 			out.ProcessPID = pid
 		}
-	}
-
-	if v := os.Getenv("PROCESS_START"); v != "" {
-		start, err := strconv.ParseInt(v, 10, 64)
-		if err != nil || start == 0 {
-			// Only warn when PROCESS_PID was set (user intended stable key but start is bad).
-			if out.ProcessPID != 0 {
-				fmt.Fprintln(os.Stderr, "tt: PROCESS_START empty or invalid, session key may be unstable")
-			}
+		if start, err := strconv.ParseInt(startEnv, 10, 64); err != nil || start == 0 {
+			fmt.Fprintln(os.Stderr, "tt: PROCESS_START empty or invalid, session key may be unstable")
 		} else {
 			out.ProcessStart = start
 		}
-	} else if out.ProcessPID != 0 {
-		// PROCESS_PID present but PROCESS_START absent → warn once.
-		fmt.Fprintln(os.Stderr, "tt: PROCESS_START empty or invalid, session key may be unstable")
+		return out, nil
 	}
 
-	return out, nil
+	ppid := os.Getppid()
+	start, err := process.StartTime(ppid)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "tt: process.StartTime: %v, session key may be unstable\n", err)
+	}
+	return recorder.PromptInput{
+		ProcessPID:   int64(ppid),
+		ProcessStart: start,
+	}, nil
 }
 
 func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
@@ -241,8 +242,10 @@ func extractFromTranscript(path string) (tokensJSON, model string) {
 		}
 	}
 
-	// Extract model from the last non-sidechain assistant entry.
-	for i := len(all) - 1; i > lastUserIdx; i-- {
+	// Extract model from the last non-sidechain assistant entry (search whole
+	// transcript — if Stop fires after /clear, lastUserIdx may be at the end
+	// leaving no assistant entries in range).
+	for i := len(all) - 1; i >= 0; i-- {
 		e := all[i]
 		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
 			model = e.Message.Model
@@ -273,7 +276,37 @@ func extractFromTranscript(path string) (tokensJSON, model string) {
 	}
 
 	if total.InputTokens == 0 && total.OutputTokens == 0 {
-		return "", model
+		// /clear race: lastUserIdx is the /clear entry; no assistant entries follow it yet.
+		// Fall back to the previous turn window [prevUserIdx+1, lastUserIdx).
+		if lastUserIdx > 0 {
+			prevUserIdx := -1
+			for i := lastUserIdx - 1; i >= 0; i-- {
+				if all[i].Type == "user" && !all[i].IsSidechain {
+					prevUserIdx = i
+					break
+				}
+			}
+			seen = make(map[usageKey]bool)
+			for i := prevUserIdx + 1; i < lastUserIdx; i++ {
+				e := all[i]
+				if e.Type != "assistant" || e.IsSidechain {
+					continue
+				}
+				u := e.Message.Usage
+				key := usageKey{u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens}
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				total.InputTokens += u.InputTokens
+				total.OutputTokens += u.OutputTokens
+				total.CacheReadInputTokens += u.CacheReadInputTokens
+				total.CacheCreationInputTokens += u.CacheCreationInputTokens
+			}
+		}
+		if total.InputTokens == 0 && total.OutputTokens == 0 {
+			return "", model
+		}
 	}
 
 	out, err := json.Marshal(map[string]int{
