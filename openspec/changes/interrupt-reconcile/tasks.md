@@ -15,14 +15,14 @@
 
 ## 3. 實作 reconcile 核心邏輯
 
-- [ ] 3.1 建立 `internal/reconcile/reconcile.go`：實作 `hasActiveSession(conn *sql.DB) bool`
-- [ ] 3.2 實作私有 `reconcile(conn *sql.DB)`：執行設計文件 D5 的 SQL 查詢，loop 每個懸空 turn
-- [ ] 3.3 在 `reconcile` loop 中加入進行中 turn 的跳過邏輯（`isLatest && processAlive → continue`）
-- [ ] 3.4 在 `reconcile` loop 中呼叫 `internal/transcript.ExtractWindow` 提取 token
-- [ ] 3.5 實作 `response_at` 估算：中間 turn 用 `next_prompt_at - 1ms`，最後 turn 用 transcript mtime
-- [ ] 3.6 執行 `UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=? WHERE id=? AND response_at IS NULL`
-- [ ] 3.7 實作 `MaybeReconcile(conn *sql.DB)`：in-process `sync.Mutex.TryLock` + `tryLock(lockPath())`，成功才呼叫 `reconcile`
-- [ ] 3.8 寫 `internal/reconcile/reconcile_test.go`：測試懸空 turn 補算後 response_at 不為 NULL、進行中 turn skip、idempotency（補算前已有 response_at 的 row 不被修改）（TDD：先寫 failing tests）
+- [x] 3.1 建立 `internal/reconcile/reconcile.go`：實作 `hasActiveSession(conn *sql.DB) bool`
+- [x] 3.2 實作私有 `reconcile(conn *sql.DB)`：執行設計文件 D5 的 SQL 查詢，loop 每個懸空 turn
+- [x] 3.3 在 `reconcile` loop 中加入進行中 turn 的跳過邏輯（`isLatest && processAlive → continue`）
+- [x] 3.4 在 `reconcile` loop 中呼叫 `internal/transcript.ExtractWindow` 提取 token
+- [x] 3.5 實作 `response_at` 估算：中間 turn 用 `next_prompt_at - 1ms`，最後 turn 用 transcript mtime
+- [x] 3.6 執行 `UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=? WHERE id=? AND response_at IS NULL`
+- [x] 3.7 實作 `MaybeReconcile(conn *sql.DB)`：in-process `sync.Mutex.TryLock` + `tryLock(lockPath())`，成功才呼叫 `reconcile`
+- [x] 3.8 寫 `internal/reconcile/reconcile_test.go`：測試懸空 turn 補算後 response_at 不為 NULL、進行中 turn skip、idempotency（補算前已有 response_at 的 row 不被修改）（TDD：先寫 failing tests）
 
 ## 4. 整合觸發點
 
