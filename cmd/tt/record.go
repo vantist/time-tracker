@@ -184,11 +184,55 @@ func resolveResponseInput(cmd *cobra.Command) (sessionID, tokensJSON, model stri
 		if sessionID == "" {
 			sessionID = stdin.SessionID
 		}
-		if tokensJSON == "" && stdin.TranscriptPath != "" {
-			tokensJSON, model = extractFromTranscript(stdin.TranscriptPath)
+	}
+
+	// If tokensJSON was not provided via flag, extract from transcript.
+	if tokensJSON == "" {
+		transcriptPath := ""
+		if stdin != nil {
+			transcriptPath = stdin.TranscriptPath
 		}
+		tokensJSON, model = resolveTokensFromTranscript(sessionID, transcriptPath)
 	}
 	return sessionID, tokensJSON, model, nil
+}
+
+// resolveTokensFromTranscript selects the extraction strategy based on whether
+// a stored prompt_line_offset exists for the latest turn of this session.
+// If the DB cannot be queried, falls back to full-transcript extraction.
+func resolveTokensFromTranscript(sessionID, transcriptPath string) (tokensJSON, model string) {
+	if transcriptPath == "" {
+		return "", ""
+	}
+
+	// Try to read offset from the DB.
+	conn, err := db.Open()
+	if err != nil {
+		return extractFromTranscript(transcriptPath)
+	}
+	defer conn.Close()
+
+	// Resolve stable session ID (same logic as RecordResponse).
+	var stableID string
+	conn.QueryRow("SELECT id FROM sessions WHERE id=?", sessionID).Scan(&stableID)
+	if stableID == "" {
+		conn.QueryRow("SELECT id FROM sessions WHERE conversation_id=?", sessionID).Scan(&stableID)
+	}
+	if stableID == "" {
+		stableID = sessionID
+	}
+
+	var storedPath string
+	var offset *int
+	conn.QueryRow(
+		"SELECT transcript_path, prompt_line_offset FROM turns WHERE session_id=? ORDER BY id DESC LIMIT 1",
+		stableID,
+	).Scan(&storedPath, &offset)
+
+	if offset != nil && storedPath != "" {
+		return extractFromTranscriptAtOffset(storedPath, *offset)
+	}
+	return extractFromTranscript(transcriptPath)
 }
 
 // extractFromTranscriptAtOffset reads only lines from offset onwards (skipping the
