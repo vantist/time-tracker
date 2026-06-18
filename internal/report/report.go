@@ -4,7 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"path"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -321,6 +321,7 @@ type rowData struct {
 }
 
 func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idleThreshold time.Duration) []GroupResult {
+	type groupKey struct{ project, label string }
 	type groupState struct {
 		project  string
 		label    string
@@ -328,11 +329,11 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 		turns    []aggregator.Turn
 		cost     *float64
 	}
-	groups := map[string]*groupState{}
-	keyOf := map[string]string{} // sessionID → composite key "project|label"
+	groups := map[groupKey]*groupState{}
+	sessGroup := map[string]*groupState{} // sessionID → group pointer
 
 	for _, r := range rows {
-		if _, seen := keyOf[r.sessionID]; !seen {
+		if _, seen := sessGroup[r.sessionID]; !seen {
 			label := r.workItem
 			if label == "" {
 				label = r.branch
@@ -340,15 +341,16 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 			if label == "" {
 				label = "untagged"
 			}
-			keyOf[r.sessionID] = r.project + "|" + label
-			key := keyOf[r.sessionID]
-			if groups[key] == nil {
-				groups[key] = &groupState{project: r.project, label: label, sessions: map[string]struct{}{}}
+			key := groupKey{r.project, label}
+			g := groups[key]
+			if g == nil {
+				g = &groupState{project: r.project, label: label, sessions: map[string]struct{}{}}
+				groups[key] = g
 			}
+			sessGroup[r.sessionID] = g
+			g.sessions[r.sessionID] = struct{}{}
 		}
-		key := keyOf[r.sessionID]
-		g := groups[key]
-		g.sessions[r.sessionID] = struct{}{}
+		g := sessGroup[r.sessionID]
 		if r.cost != nil {
 			if g.cost == nil {
 				v := 0.0
@@ -359,8 +361,7 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 	}
 
 	for sessID, turns := range sessTurns {
-		key := keyOf[sessID]
-		if g, ok := groups[key]; ok {
+		if g, ok := sessGroup[sessID]; ok {
 			g.turns = append(g.turns, turns...)
 		}
 	}
@@ -371,7 +372,7 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 		userSec := int64(aggregator.UserActiveTime(g.turns, time.Time{}, idleThreshold).Seconds())
 		result = append(result, GroupResult{
 			Label:             g.label,
-			Project:           path.Base(g.project),
+			Project:           filepath.Base(g.project),
 			SessionsCount:     len(g.sessions),
 			AgentTimeSec:      agentSec,
 			UserActiveTimeSec: userSec,

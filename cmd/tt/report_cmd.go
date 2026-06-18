@@ -66,8 +66,8 @@ var reportCmd = &cobra.Command{
 					if g.EstimatedCostUSD != nil {
 						costStr = fmt.Sprintf("$%.4f", *g.EstimatedCostUSD)
 					}
-					fmt.Printf("  %-30s  %dh %dm  %s\n",
-						g.Label,
+					fmt.Printf("  %-20s  %-20s  %dh %dm  %s\n",
+						g.Project, g.Label,
 						g.AgentTimeSec/3600, (g.AgentTimeSec%3600)/60,
 						costStr,
 					)
