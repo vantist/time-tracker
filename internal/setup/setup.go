@@ -10,6 +10,7 @@ import (
 var ttHooks = map[string]interface{}{
 	"UserPromptSubmit": []interface{}{
 		map[string]interface{}{
+			"_owner": "tt",
 			"hooks": []interface{}{
 				map[string]interface{}{
 					"type":    "command",
@@ -20,6 +21,7 @@ var ttHooks = map[string]interface{}{
 	},
 	"Stop": []interface{}{
 		map[string]interface{}{
+			"_owner": "tt",
 			"hooks": []interface{}{
 				map[string]interface{}{"type": "command", "command": "tt record response"},
 			},
@@ -58,12 +60,15 @@ func SetupClaudeCode() error {
 	}
 	for event, hookVal := range ttHooks {
 		newEntries, _ := hookVal.([]interface{})
-		if _, exists := hooks[event]; !exists {
-			hooks[event] = newEntries
-		} else {
-			existing, _ := hooks[event].([]interface{})
-			hooks[event] = append(existing, newEntries...)
+		existing, _ := hooks[event].([]interface{})
+		var filtered []interface{}
+		for _, e := range existing {
+			em, _ := e.(map[string]interface{})
+			if em["_owner"] != "tt" {
+				filtered = append(filtered, e)
+			}
 		}
+		hooks[event] = append(filtered, newEntries...)
 	}
 	settings["hooks"] = hooks
 
