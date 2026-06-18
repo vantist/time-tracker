@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -58,11 +59,6 @@ var recordResponseCmd = &cobra.Command{
 	Use:   "response",
 	Short: "Record a response/stop event",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		sessionID, tokensJSON, model, err := resolveResponseInput(cmd)
-		if err != nil {
-			return err
-		}
-
 		conn, err := db.Open()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "tt: db open error: %v\n", err)
@@ -70,8 +66,31 @@ var recordResponseCmd = &cobra.Command{
 		}
 		defer conn.Close()
 
+		sessionID, tokensJSON, model, err := resolveResponseInput(cmd, conn)
+		if err != nil {
+			return err
+		}
+
 		return recorder.RecordResponseSilent(conn, sessionID, tokensJSON, model)
 	},
+}
+
+// transcriptUsageFields mirrors the usage fields in a Claude Code transcript entry.
+type transcriptUsageFields struct {
+	InputTokens              int `json:"input_tokens"`
+	OutputTokens             int `json:"output_tokens"`
+	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+}
+
+// transcriptEntry is one JSONL line in a Claude Code transcript file.
+type transcriptEntry struct {
+	Type        string `json:"type"`
+	IsSidechain bool   `json:"isSidechain"`
+	Message     struct {
+		Model string                `json:"model"`
+		Usage transcriptUsageFields `json:"usage"`
+	} `json:"message"`
 }
 
 // hookPayload covers both Claude Code and Copilot CLI stdin formats.
@@ -174,7 +193,7 @@ func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
 	}, nil
 }
 
-func resolveResponseInput(cmd *cobra.Command) (sessionID, tokensJSON, model string, err error) {
+func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJSON, model string, err error) {
 	stdin, _ := readStdinJSON()
 
 	sessionID, _ = cmd.Flags().GetString("session")
@@ -192,25 +211,18 @@ func resolveResponseInput(cmd *cobra.Command) (sessionID, tokensJSON, model stri
 		if stdin != nil {
 			transcriptPath = stdin.TranscriptPath
 		}
-		tokensJSON, model = resolveTokensFromTranscript(sessionID, transcriptPath)
+		tokensJSON, model = resolveTokensFromTranscript(conn, sessionID, transcriptPath)
 	}
 	return sessionID, tokensJSON, model, nil
 }
 
 // resolveTokensFromTranscript selects the extraction strategy based on whether
 // a stored prompt_line_offset exists for the latest turn of this session.
-// If the DB cannot be queried, falls back to full-transcript extraction.
-func resolveTokensFromTranscript(sessionID, transcriptPath string) (tokensJSON, model string) {
+// Falls back to full-transcript extraction when offset is absent.
+func resolveTokensFromTranscript(conn *sql.DB, sessionID, transcriptPath string) (tokensJSON, model string) {
 	if transcriptPath == "" {
 		return "", ""
 	}
-
-	// Try to read offset from the DB.
-	conn, err := db.Open()
-	if err != nil {
-		return extractFromTranscript(transcriptPath)
-	}
-	defer conn.Close()
 
 	// Resolve stable session ID (same logic as RecordResponse).
 	var stableID string
@@ -235,46 +247,13 @@ func resolveTokensFromTranscript(sessionID, transcriptPath string) (tokensJSON, 
 	return extractFromTranscript(transcriptPath)
 }
 
-// extractFromTranscriptAtOffset reads only lines from offset onwards (skipping the
-// first `offset` lines) to sum assistant token entries for the current turn.
-// Model is still resolved from the last non-sidechain assistant entry in the full transcript.
+// extractFromTranscriptAtOffset decodes the full transcript then sums only the
+// assistant entries at index >= offset (the anchor recorded at prompt time).
+// Model is resolved from the last non-sidechain assistant entry in the full file.
 func extractFromTranscriptAtOffset(path string, offset int) (tokensJSON, model string) {
-	if len(path) >= 2 && path[:2] == "~/" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			path = filepath.Join(home, path[2:])
-		}
-	}
-
-	f, err := os.Open(path)
-	if err != nil {
+	all := loadTranscript(path)
+	if len(all) == 0 {
 		return "", ""
-	}
-	defer f.Close()
-
-	type usageFields struct {
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	}
-	type transcriptEntry struct {
-		Type        string `json:"type"`
-		IsSidechain bool   `json:"isSidechain"`
-		Message     struct {
-			Model string      `json:"model"`
-			Usage usageFields `json:"usage"`
-		} `json:"message"`
-	}
-
-	var all []transcriptEntry
-	dec := json.NewDecoder(f)
-	for dec.More() {
-		var entry transcriptEntry
-		if err := dec.Decode(&entry); err != nil {
-			continue
-		}
-		all = append(all, entry)
 	}
 
 	// Model from last non-sidechain assistant entry (whole transcript).
@@ -291,25 +270,7 @@ func extractFromTranscriptAtOffset(path string, offset int) (tokensJSON, model s
 		offset = len(all)
 	}
 
-	type usageKey struct{ in, out, read, create int }
-	seen := make(map[usageKey]bool)
-	var acc usageFields
-	for i := offset; i < len(all); i++ {
-		e := all[i]
-		if e.Type != "assistant" || e.IsSidechain {
-			continue
-		}
-		u := e.Message.Usage
-		k := usageKey{u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens}
-		if seen[k] {
-			continue
-		}
-		seen[k] = true
-		acc.InputTokens += u.InputTokens
-		acc.OutputTokens += u.OutputTokens
-		acc.CacheReadInputTokens += u.CacheReadInputTokens
-		acc.CacheCreationInputTokens += u.CacheCreationInputTokens
-	}
+	acc := sumWindow(all, offset, len(all))
 
 	if acc.InputTokens == 0 && acc.OutputTokens == 0 {
 		return "", model
@@ -327,44 +288,20 @@ func extractFromTranscriptAtOffset(path string, offset int) (tokensJSON, model s
 	return string(out), model
 }
 
-// extractFromTranscript reads the transcript JSONL and returns the summed
-// token usage across all API calls in the last user turn as a flat JSON string,
-// plus the model from the last non-sidechain assistant entry.
-//
-// Claude Code writes multiple assistant entries per API call (one per content
-// block: thinking/text/tool_use), all sharing identical usage stats. We
-// deduplicate by (input, output, cache_read, cache_creation) before summing
-// so each API call is counted exactly once.
-func extractFromTranscript(path string) (tokensJSON, model string) {
+// loadTranscript opens and decodes all entries from a JSONL transcript file.
+// Returns nil on error. Expands a leading "~/" to the user home directory.
+func loadTranscript(path string) []transcriptEntry {
 	if len(path) >= 2 && path[:2] == "~/" {
 		home, err := os.UserHomeDir()
 		if err == nil {
 			path = filepath.Join(home, path[2:])
 		}
 	}
-
 	f, err := os.Open(path)
 	if err != nil {
-		return "", ""
+		return nil
 	}
 	defer f.Close()
-
-	type usageFields struct {
-		InputTokens              int `json:"input_tokens"`
-		OutputTokens             int `json:"output_tokens"`
-		CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-		CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
-	}
-	type transcriptEntry struct {
-		Type        string `json:"type"`
-		IsSidechain bool   `json:"isSidechain"`
-		Message     struct {
-			Model string      `json:"model"`
-			Usage usageFields `json:"usage"`
-		} `json:"message"`
-	}
-
-	// Collect all entries, then work backwards from the end.
 	var all []transcriptEntry
 	dec := json.NewDecoder(f)
 	for dec.More() {
@@ -373,6 +310,47 @@ func extractFromTranscript(path string) (tokensJSON, model string) {
 			continue
 		}
 		all = append(all, entry)
+	}
+	return all
+}
+
+// sumWindow deduplicates assistant entries by usage tuple in all[from:to] and
+// returns their sum. Each unique (input, output, cacheRead, cacheCreate) tuple
+// represents one API call; duplicate content blocks are skipped.
+func sumWindow(all []transcriptEntry, from, to int) transcriptUsageFields {
+	type usageKey struct{ in, out, read, create int }
+	seen := make(map[usageKey]bool)
+	var acc transcriptUsageFields
+	for i := from; i < to; i++ {
+		e := all[i]
+		if e.Type != "assistant" || e.IsSidechain {
+			continue
+		}
+		u := e.Message.Usage
+		k := usageKey{u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		acc.InputTokens += u.InputTokens
+		acc.OutputTokens += u.OutputTokens
+		acc.CacheReadInputTokens += u.CacheReadInputTokens
+		acc.CacheCreationInputTokens += u.CacheCreationInputTokens
+	}
+	return acc
+}
+
+// extractFromTranscript returns summed token usage for the last user turn plus
+// the model from the last non-sidechain assistant entry.
+//
+// Claude Code writes multiple assistant entries per API call (one per content
+// block: thinking/text/tool_use), all sharing identical usage stats. We
+// deduplicate by (input, output, cache_read, cache_creation) before summing
+// so each API call is counted exactly once.
+func extractFromTranscript(path string) (tokensJSON, model string) {
+	all := loadTranscript(path)
+	if len(all) == 0 {
+		return "", ""
 	}
 
 	// Find the index of the last non-sidechain user entry; assistant entries
@@ -396,31 +374,7 @@ func extractFromTranscript(path string) (tokensJSON, model string) {
 		}
 	}
 
-	// sumWindow deduplicates assistant entries by usage tuple and returns their sum.
-	type usageKey struct{ in, out, read, create int }
-	sumWindow := func(from, to int) usageFields {
-		seen := make(map[usageKey]bool)
-		var acc usageFields
-		for i := from; i < to; i++ {
-			e := all[i]
-			if e.Type != "assistant" || e.IsSidechain {
-				continue
-			}
-			u := e.Message.Usage
-			k := usageKey{u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens}
-			if seen[k] {
-				continue
-			}
-			seen[k] = true
-			acc.InputTokens += u.InputTokens
-			acc.OutputTokens += u.OutputTokens
-			acc.CacheReadInputTokens += u.CacheReadInputTokens
-			acc.CacheCreationInputTokens += u.CacheCreationInputTokens
-		}
-		return acc
-	}
-
-	total := sumWindow(lastUserIdx+1, len(all))
+	total := sumWindow(all, lastUserIdx+1, len(all))
 
 	if total.InputTokens == 0 && total.OutputTokens == 0 {
 		// /clear race: lastUserIdx is the /clear entry; no assistant entries follow it yet.
@@ -433,7 +387,7 @@ func extractFromTranscript(path string) (tokensJSON, model string) {
 					break
 				}
 			}
-			total = sumWindow(prevUserIdx+1, lastUserIdx)
+			total = sumWindow(all, prevUserIdx+1, lastUserIdx)
 		}
 		if total.InputTokens == 0 && total.OutputTokens == 0 {
 			return "", model

@@ -1,9 +1,10 @@
 package recorder
 
 import (
-	"bufio"
+	"bytes"
 	"database/sql"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -58,8 +59,8 @@ func RecordPrompt(conn *sql.DB, input PromptInput) error {
 	return err
 }
 
-// countLines returns the number of newline-terminated lines in the file.
-// Returns 0 if the file cannot be opened.
+// countLines counts newline characters in the file; handles lines of any length.
+// Returns 0 if the file cannot be read.
 func countLines(path string) int {
 	if path == "" {
 		return 0
@@ -69,12 +70,11 @@ func countLines(path string) int {
 		return 0
 	}
 	defer f.Close()
-	n := 0
-	sc := bufio.NewScanner(f)
-	for sc.Scan() {
-		n++
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return 0
 	}
-	return n
+	return bytes.Count(data, []byte("\n"))
 }
 
 func gitBranch(dir string) string {
