@@ -6,6 +6,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/user/tt/internal/db"
+	"github.com/user/tt/internal/reconcile"
 	"github.com/user/tt/internal/report"
 )
 
@@ -36,6 +37,8 @@ var reportCmd = &cobra.Command{
 			return err
 		}
 		defer conn.Close()
+
+		reconcile.MaybeReconcile(conn)
 
 		result, err := report.Query(conn, report.Options{
 			Since:      since,

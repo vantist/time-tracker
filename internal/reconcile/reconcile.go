@@ -36,6 +36,11 @@ func MaybeReconcile(conn *sql.DB) {
 	reconcile(conn)
 }
 
+// HasActiveSession returns true if any session has a currently running process.
+func HasActiveSession(conn *sql.DB) bool {
+	return hasActiveSession(conn)
+}
+
 // hasActiveSession returns true if any session has a currently running process.
 func hasActiveSession(conn *sql.DB) bool {
 	rows, err := conn.Query("SELECT process_pid, process_start FROM sessions WHERE ended_at IS NULL")

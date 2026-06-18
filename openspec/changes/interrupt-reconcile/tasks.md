@@ -26,9 +26,9 @@
 
 ## 4. 整合觸發點
 
-- [ ] 4.1 修改 `cmd/tt/serve_cmd.go`：在 HTTP server 啟動前呼叫 `reconcile.MaybeReconcile(conn)`
-- [ ] 4.2 修改 `cmd/tt/report_cmd.go`：在輸出報告前呼叫 `reconcile.MaybeReconcile(conn)`
-- [ ] 4.3 修改 `/api/report` handler（`cmd/tt/api.go` 或相關 serve handler）：呼叫前先 `hasActiveSession`，false 才呼叫 `MaybeReconcile`
+- [x] 4.1 修改 `cmd/tt/serve_cmd.go`：在 HTTP server 啟動前呼叫 `reconcile.MaybeReconcile(conn)`
+- [x] 4.2 修改 `cmd/tt/report_cmd.go`：在輸出報告前呼叫 `reconcile.MaybeReconcile(conn)`
+- [x] 4.3 修改 `/api/report` handler（`cmd/tt/api.go` 或相關 serve handler）：呼叫前先 `hasActiveSession`，false 才呼叫 `MaybeReconcile`
 
 ## 5. 驗證
 
