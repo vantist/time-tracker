@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/user/tt/internal/db"
@@ -339,6 +340,79 @@ func sumWindow(all []transcriptEntry, from, to int) transcriptUsageFields {
 	for i := from; i < to; i++ {
 		e := all[i]
 		if e.Type != "assistant" || e.IsSidechain {
+			continue
+		}
+		u := e.Message.Usage
+		k := usageKey{u.InputTokens, u.OutputTokens, u.CacheReadInputTokens, u.CacheCreationInputTokens}
+		if seen[k] {
+			continue
+		}
+		seen[k] = true
+		acc.InputTokens += u.InputTokens
+		acc.OutputTokens += u.OutputTokens
+		acc.CacheReadInputTokens += u.CacheReadInputTokens
+		acc.CacheCreationInputTokens += u.CacheCreationInputTokens
+	}
+	return acc
+}
+
+// extractSubagentTokens scans entries[offset:] for Agent tool_use IDs, then reads
+// the corresponding subagent jsonl files and sums their token usage.
+// All errors are silently ignored; zero is returned when nothing can be read.
+func extractSubagentTokens(transcriptPath string, entries []transcriptEntry, offset int) transcriptUsageFields {
+	// Collect Agent tool_use IDs from entries at or after offset.
+	agentIDs := make(map[string]bool)
+	for i := offset; i < len(entries); i++ {
+		e := entries[i]
+		if e.Type != "assistant" {
+			continue
+		}
+		for _, blk := range e.Content {
+			if blk.Type == "tool_use" && blk.Name == "Agent" && blk.ID != "" {
+				agentIDs[blk.ID] = true
+			}
+		}
+	}
+	if len(agentIDs) == 0 {
+		return transcriptUsageFields{}
+	}
+
+	subagentsDir := filepath.Join(strings.TrimSuffix(transcriptPath, ".jsonl"), "subagents")
+	metas, err := filepath.Glob(filepath.Join(subagentsDir, "*.meta.json"))
+	if err != nil || len(metas) == 0 {
+		return transcriptUsageFields{}
+	}
+
+	var acc transcriptUsageFields
+	for _, metaPath := range metas {
+		data, err := os.ReadFile(metaPath)
+		if err != nil {
+			continue
+		}
+		var meta subagentMeta
+		if err := json.Unmarshal(data, &meta); err != nil || !agentIDs[meta.ToolUseID] {
+			continue
+		}
+		// Derive agent jsonl path from meta path.
+		base := strings.TrimSuffix(metaPath, ".meta.json")
+		agentEntries := loadTranscript(base + ".jsonl")
+		sub := sumSubagentWindow(agentEntries)
+		acc.InputTokens += sub.InputTokens
+		acc.OutputTokens += sub.OutputTokens
+		acc.CacheReadInputTokens += sub.CacheReadInputTokens
+		acc.CacheCreationInputTokens += sub.CacheCreationInputTokens
+	}
+	return acc
+}
+
+// sumSubagentWindow deduplicates and sums all assistant entries in a subagent transcript.
+// Unlike sumWindow, it does not filter out isSidechain entries — subagent entries are all sidechain.
+func sumSubagentWindow(entries []transcriptEntry) transcriptUsageFields {
+	type usageKey struct{ in, out, read, create int }
+	seen := make(map[usageKey]bool)
+	var acc transcriptUsageFields
+	for _, e := range entries {
+		if e.Type != "assistant" {
 			continue
 		}
 		u := e.Message.Usage
