@@ -1,21 +1,41 @@
 package pricing
 
+import (
+	"regexp"
+	"strings"
+)
+
+var dateSuffix = regexp.MustCompile(`-\d{8}$`)
+
 type modelPricing struct {
-	input          float64
-	output         float64
-	cacheRead      float64
-	cacheCreation  float64
+	input         float64
+	output        float64
+	cacheRead     float64
+	cacheCreation float64
 }
 
 var table = map[string]modelPricing{
-	"claude-haiku-4-5-20251001": {0.80, 4.00, 0.08, 1.00},
-	"claude-sonnet-4-6":         {3.00, 15.00, 0.30, 3.75},
-	"claude-opus-4-8":           {15.00, 75.00, 1.50, 18.75},
+	"claude-fable-5":    {10.00, 50.00, 1.00, 12.50},
+	"claude-opus-4-8":   {5.00, 25.00, 0.50, 6.25},
+	"claude-opus-4-7":   {5.00, 25.00, 0.50, 6.25},
+	"claude-opus-4-6":   {5.00, 25.00, 0.50, 6.25},
+	"claude-opus-4-5":   {5.00, 25.00, 0.50, 6.25},
+	"claude-sonnet-4-6": {3.00, 15.00, 0.30, 3.75},
+	"claude-sonnet-4-5": {3.00, 15.00, 0.30, 3.75},
+	"claude-haiku-4-5":  {1.00, 5.00, 0.10, 1.25},
+	"claude-haiku-3-5":  {0.80, 4.00, 0.08, 1.00},
+}
+
+func normalize(model string) string {
+	if i := strings.LastIndex(model, "/"); i >= 0 {
+		model = model[i+1:]
+	}
+	return dateSuffix.ReplaceAllString(model, "")
 }
 
 // Calculate returns estimated cost in USD, or nil for unknown models.
 func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation int) *float64 {
-	p, ok := table[model]
+	p, ok := table[normalize(model)]
 	if !ok {
 		return nil
 	}

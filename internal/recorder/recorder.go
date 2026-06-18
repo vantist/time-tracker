@@ -1,8 +1,11 @@
 package recorder
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
+	"io"
+	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -12,35 +15,66 @@ import (
 )
 
 type PromptInput struct {
-	SessionID string
-	Project   string
-	Tool      string
-	Model     string
+	SessionID      string
+	Project        string
+	Tool           string
+	Model          string
+	ProcessPID     int64
+	ProcessStart   int64
+	TranscriptPath string
 }
 
 func RecordPrompt(conn *sql.DB, input PromptInput) error {
 	now := time.Now().UTC()
 
 	branch := gitBranch(input.Project)
-	wi, _ := workitem.Get()
+	wi, _ := workitem.Get(input.Project)
 
-	if err := db.UpsertSession(conn, db.Session{
-		ID:        input.SessionID,
-		Project:   input.Project,
-		Tool:      input.Tool,
-		Model:     input.Model,
-		Branch:    branch,
-		WorkItem:  wi,
-		StartedAt: now,
-	}); err != nil {
+	stableID, err := db.UpsertSession(conn, db.Session{
+		ID:             input.SessionID,
+		Project:        input.Project,
+		Tool:           input.Tool,
+		Model:          input.Model,
+		Branch:         branch,
+		WorkItem:       wi,
+		StartedAt:      now,
+		ProcessPID:     input.ProcessPID,
+		ProcessStart:   input.ProcessStart,
+		ConversationID: input.SessionID,
+	})
+	if err != nil {
 		return fmt.Errorf("upsert session: %w", err)
 	}
 
-	_, err := conn.Exec(
-		`INSERT INTO turns (session_id, prompt_at) VALUES (?, ?)`,
-		input.SessionID, now.Format(time.RFC3339),
+	// Use stable session ID for turns so JOIN sessions s ON s.id = t.session_id works.
+	offset := countLines(input.TranscriptPath)
+	var transcriptPath interface{}
+	if input.TranscriptPath != "" {
+		transcriptPath = input.TranscriptPath
+	}
+	_, err = conn.Exec(
+		`INSERT INTO turns (session_id, prompt_at, transcript_path, prompt_line_offset) VALUES (?, ?, ?, ?)`,
+		stableID, now.Format(time.RFC3339), transcriptPath, offset,
 	)
 	return err
+}
+
+// countLines counts newline characters in the file; handles lines of any length.
+// Returns 0 if the file cannot be read.
+func countLines(path string) int {
+	if path == "" {
+		return 0
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return 0
+	}
+	defer f.Close()
+	data, err := io.ReadAll(f)
+	if err != nil {
+		return 0
+	}
+	return bytes.Count(data, []byte("\n"))
 }
 
 func gitBranch(dir string) string {
@@ -50,4 +84,19 @@ func gitBranch(dir string) string {
 		return ""
 	}
 	return strings.TrimSpace(string(out))
+}
+
+// resolveStableSessionID finds the sessions.id for a given sessionID which may
+// be either a stable session ID or a conversation UUID stored in conversation_id.
+func resolveStableSessionID(conn *sql.DB, sessionID string) string {
+	// Fast path: direct match on sessions.id
+	var id string
+	err := conn.QueryRow("SELECT id FROM sessions WHERE id = ?", sessionID).Scan(&id)
+	if err == nil {
+		return id
+	}
+	// Fallback: sessionID is a conversation UUID stored in conversation_id.
+	// Scan error (not-found or DB error) leaves id as "" — caller handles both.
+	_ = conn.QueryRow("SELECT id FROM sessions WHERE conversation_id = ?", sessionID).Scan(&id)
+	return id
 }

@@ -48,3 +48,36 @@ func TestOpenDefaultPathWhenEnvUnset(t *testing.T) {
 		t.Errorf("expected data.db at ~/.tt/data.db: %v", err)
 	}
 }
+
+// TestMigrate_NewColumns verifies that process_pid, process_start, conversation_id
+// columns exist after migration and that existing rows have NULL values.
+func TestMigrate_NewColumns(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "test.db")
+	t.Setenv("TT_DB_PATH", dbPath)
+
+	conn, err := db.Open()
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer conn.Close()
+
+	// Insert a row using only original columns (simulate old data)
+	_, err = conn.Exec(`INSERT INTO sessions (id, started_at) VALUES ('old-sess', '2026-01-01T00:00:00Z')`)
+	if err != nil {
+		t.Fatalf("insert old row: %v", err)
+	}
+
+	// Confirm new columns exist by querying them
+	for _, col := range []string{"process_pid", "process_start", "conversation_id"} {
+		var val interface{}
+		err := conn.QueryRow("SELECT "+col+" FROM sessions WHERE id='old-sess'").Scan(&val)
+		if err != nil {
+			t.Errorf("column %q missing or not queryable: %v", col, err)
+			continue
+		}
+		if val != nil {
+			t.Errorf("column %q: expected NULL for old row, got %v", col, val)
+		}
+	}
+}

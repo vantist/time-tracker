@@ -17,6 +17,23 @@ tt work "feature-xyz"     # 標記目前工作項目
 - [docs/commands.md](docs/commands.md) — 完整指令參考、flag 說明、hook 設定範例
 - [design.md](design.md) — Hook 整合設計筆記（Claude Code / Copilot CLI stdin 格式）
 
+## Commit 規範
+
+所有 commit 訊息必須遵守 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
+
+```
+<type>[optional scope][optional !]: <description>
+```
+
+允許的 type：`feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `chore`, `ci`, `build`, `revert`
+
+範例：
+- `feat: add session export command`
+- `fix(db): handle null timestamp on migration`
+- `chore: update go dependencies`
+
+**不合規的 commit 會導致 release-please 跳過該 commit，不計入版本號與 changelog。**
+
 ## 核心慣例
 
 - `internal/` 所有 package 職責單一：db（schema/連線）、recorder（寫入）、report（讀取）、aggregator（時間計算）、pricing（費用）

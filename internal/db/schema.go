@@ -36,7 +36,7 @@ func Open() (*sql.DB, error) {
 }
 
 func migrate(db *sql.DB) error {
-	_, err := db.Exec(`
+	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS sessions (
 			id          TEXT PRIMARY KEY,
 			project     TEXT,
@@ -59,6 +59,93 @@ func migrate(db *sql.DB) error {
 			cache_creation_tokens INTEGER,
 			estimated_cost_usd  REAL
 		);
-	`)
-	return err
+	`); err != nil {
+		return err
+	}
+
+	if err := addSessionColumns(db); err != nil {
+		return err
+	}
+	return addTurnColumns(db)
+}
+
+// addTurnColumns adds transcript_path and prompt_line_offset to turns
+// if they don't already exist (SQLite does not support ADD COLUMN IF NOT EXISTS).
+func addTurnColumns(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(turns)")
+	if err != nil {
+		return err
+	}
+	existing := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var dflt interface{}
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[name] = true
+	}
+	rows.Close()
+
+	alters := []struct {
+		col string
+		def string
+	}{
+		{"transcript_path", "TEXT"},
+		{"prompt_line_offset", "INTEGER"},
+	}
+	for _, a := range alters {
+		if existing[a.col] {
+			continue
+		}
+		if _, err := db.Exec("ALTER TABLE turns ADD COLUMN " + a.col + " " + a.def); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// addSessionColumns adds process_pid, process_start, conversation_id to sessions
+// if they don't already exist (SQLite does not support ADD COLUMN IF NOT EXISTS).
+func addSessionColumns(db *sql.DB) error {
+	rows, err := db.Query("PRAGMA table_info(sessions)")
+	if err != nil {
+		return err
+	}
+	existing := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notNull int
+		var dflt interface{}
+		var pk int
+		if err := rows.Scan(&cid, &name, &typ, &notNull, &dflt, &pk); err != nil {
+			rows.Close()
+			return err
+		}
+		existing[name] = true
+	}
+	rows.Close()
+
+	alters := []struct {
+		col string
+		def string
+	}{
+		{"process_pid", "INTEGER"},
+		{"process_start", "INTEGER"},
+		{"conversation_id", "TEXT"},
+	}
+	for _, a := range alters {
+		if existing[a.col] {
+			continue
+		}
+		if _, err := db.Exec("ALTER TABLE sessions ADD COLUMN " + a.col + " " + a.def); err != nil {
+			return err
+		}
+	}
+	return nil
 }

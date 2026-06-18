@@ -3,6 +3,7 @@ package setup
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -10,13 +11,18 @@ import (
 var ttHooks = map[string]interface{}{
 	"UserPromptSubmit": []interface{}{
 		map[string]interface{}{
+			"_owner": "tt",
 			"hooks": []interface{}{
-				map[string]interface{}{"type": "command", "command": "tt record prompt"},
+				map[string]interface{}{
+					"type":    "command",
+					"command": "tt record prompt",
+				},
 			},
 		},
 	},
 	"Stop": []interface{}{
 		map[string]interface{}{
+			"_owner": "tt",
 			"hooks": []interface{}{
 				map[string]interface{}{"type": "command", "command": "tt record response"},
 			},
@@ -30,7 +36,7 @@ func SetupClaudeCode() error {
 		return err
 	}
 	claudeDir := filepath.Join(home, ".claude")
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+	if err := os.MkdirAll(claudeDir, 0o700); err != nil {
 		return err
 	}
 	settingsPath := filepath.Join(claudeDir, "settings.json")
@@ -44,7 +50,7 @@ func SetupClaudeCode() error {
 		return err
 	} else {
 		if err := json.Unmarshal(data, &settings); err != nil {
-			settings = map[string]interface{}{}
+			return fmt.Errorf("settings.json is corrupt: %w", err)
 		}
 	}
 
@@ -55,12 +61,15 @@ func SetupClaudeCode() error {
 	}
 	for event, hookVal := range ttHooks {
 		newEntries, _ := hookVal.([]interface{})
-		if _, exists := hooks[event]; !exists {
-			hooks[event] = newEntries
-		} else {
-			existing, _ := hooks[event].([]interface{})
-			hooks[event] = append(existing, newEntries...)
+		existing, _ := hooks[event].([]interface{})
+		var filtered []interface{}
+		for _, e := range existing {
+			em, _ := e.(map[string]interface{})
+			if em["_owner"] != "tt" {
+				filtered = append(filtered, e)
+			}
 		}
+		hooks[event] = append(filtered, newEntries...)
 	}
 	settings["hooks"] = hooks
 
@@ -68,7 +77,7 @@ func SetupClaudeCode() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(settingsPath, out, 0o644)
+	return os.WriteFile(settingsPath, out, 0o600)
 }
 
 const CopilotInstructions = `To set up GitHub Copilot CLI hooks, add the following to ~/.copilot/settings.json:
