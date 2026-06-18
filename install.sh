@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="vantist/time-checker"
+REPO="vantist/time-tracker"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 BIN="$INSTALL_DIR/tt"
 
