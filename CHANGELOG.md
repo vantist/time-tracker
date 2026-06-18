@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.4.0](https://github.com/vantist/time-tracker/compare/v1.3.2...v1.4.0) (2026-06-18)
+
+
+### Features
+
+* **dashboard:** By Work Item table 新增 Project 欄位 ([8bf3201](https://github.com/vantist/time-tracker/commit/8bf3201292dff954a9ba73c7c0963c1a4a197a7a))
+* **report:** 以複合 key 修正 work item 跨 repo label 碰撞 ([5aed2d5](https://github.com/vantist/time-tracker/commit/5aed2d561176ac2696867585842cf90c1fdba31e))
+
+
+### Bug Fixes
+
+* **report:** 用 struct key 取代 | 分隔符以防止 work_item 碰撞 ([d7ee48a](https://github.com/vantist/time-tracker/commit/d7ee48a9d6a6049bb50bbaa7debc549e4bbbbb0a))
+* **transcript:** 將 content 欄位移至 message 底下以修正 subagent token 遺失 ([766164e](https://github.com/vantist/time-tracker/commit/766164e62e06056ca702d1676bf2e745fbd74d04))
+
 ## [1.3.2](https://github.com/vantist/time-tracker/compare/v1.3.1...v1.3.2) (2026-06-18)
 
 
