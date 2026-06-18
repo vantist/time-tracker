@@ -3,6 +3,7 @@ package setup
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -14,7 +15,7 @@ var ttHooks = map[string]interface{}{
 			"hooks": []interface{}{
 				map[string]interface{}{
 					"type":    "command",
-					"command": `PROCESS_PID=$PPID PROCESS_START=$(( $(date +%s) - $(ps -p $PPID -o etime= | tr -d ' ' | awk -F'[:-]' '{n=NF;s=0;if(n>=1)s+=$n;if(n>=2)s+=$(n-1)*60;if(n>=3)s+=$(n-2)*3600;if(n>=4)s+=$(n-3)*86400;print s}') )) tt record prompt`,
+					"command": "tt record prompt",
 				},
 			},
 		},
@@ -35,7 +36,7 @@ func SetupClaudeCode() error {
 		return err
 	}
 	claudeDir := filepath.Join(home, ".claude")
-	if err := os.MkdirAll(claudeDir, 0o755); err != nil {
+	if err := os.MkdirAll(claudeDir, 0o700); err != nil {
 		return err
 	}
 	settingsPath := filepath.Join(claudeDir, "settings.json")
@@ -49,7 +50,7 @@ func SetupClaudeCode() error {
 		return err
 	} else {
 		if err := json.Unmarshal(data, &settings); err != nil {
-			settings = map[string]interface{}{}
+			return fmt.Errorf("settings.json is corrupt: %w", err)
 		}
 	}
 
@@ -76,7 +77,7 @@ func SetupClaudeCode() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(settingsPath, out, 0o644)
+	return os.WriteFile(settingsPath, out, 0o600)
 }
 
 const CopilotInstructions = `To set up GitHub Copilot CLI hooks, add the following to ~/.copilot/settings.json:

@@ -47,7 +47,8 @@ func TestSetupClaudeCodeFresh(t *testing.T) {
 	}
 }
 
-// TestSetupClaudeCode_HookCommand: UserPromptSubmit hook command contains PROCESS_PID env var.
+// TestSetupClaudeCode_HookCommand: UserPromptSubmit hook command is exactly "tt record prompt",
+// no bash shell substitution syntax.
 func TestSetupClaudeCode_HookCommand(t *testing.T) {
 	home := setupHome(t)
 
@@ -83,8 +84,13 @@ func TestSetupClaudeCode_HookCommand(t *testing.T) {
 	if cmd == "" {
 		t.Fatal("UserPromptSubmit hook command is empty")
 	}
-	if !strings.Contains(cmd, "PROCESS_PID") {
-		t.Errorf("hook command %q does not contain PROCESS_PID", cmd)
+	if cmd != "tt record prompt" {
+		t.Errorf("hook command = %q, want %q", cmd, "tt record prompt")
+	}
+	for _, banned := range []string{"$PPID", "$(", "date", "ps ", "awk"} {
+		if strings.Contains(cmd, banned) {
+			t.Errorf("hook command contains bash-only syntax %q: %s", banned, cmd)
+		}
 	}
 }
 
