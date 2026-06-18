@@ -55,6 +55,7 @@ tt report --since 30d --by-work-item
 | `tt setup --copilot` | 顯示 Copilot CLI 手動設定說明（尚未實測）|
 | `tt work [label]` | 設定 / 顯示 / `--clear` 工作項目標記 |
 | `tt report` | 顯示時間與費用報表 |
+| `tt serve` | 啟動 Web dashboard（預設 port 7890） |
 | `tt config set <key> <val>` | 設定持久化設定值 |
 | `tt version` | 顯示版本 |
 

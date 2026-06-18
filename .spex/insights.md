@@ -1,5 +1,13 @@
 # Spex Insights
 
+## [spex-debugging] workflow-subagent-tokens-missing — 2026-06-18
+
+### Promote candidates
+
+- [ ] Claude Code transcript `content` blocks live under `message.content`, not top-level
+  > **Why**: `extractSubagentTokens` scanned `e.Content` (top-level) which is always nil — transcript JSONL puts tool_use blocks under `e.message.content`. Zero subagent IDs found → all subagent tokens silently dropped.
+  > **How to apply**: When parsing Claude Code JSONL entries for tool_use/content blocks, always read `entry.Message.Content`, never `entry.Content`. Verify against a real transcript before writing new struct tags.
+
 ## [spex-debugging] token-count-mismatch — 2026-06-18
 
 ### Promote candidates

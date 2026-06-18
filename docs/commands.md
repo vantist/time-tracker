@@ -75,6 +75,23 @@ tt report [flags]
 
 ---
 
+### `tt serve`
+
+啟動 Web dashboard，在瀏覽器呈現互動式報表。
+
+```bash
+tt serve [flags]
+```
+
+| Flag | 說明 | 預設 |
+|------|------|------|
+| `--port int` | HTTP server 埠號 | `7890` |
+| `--since string` | 時間範圍：`7d`、`30d`、`YYYY-MM-DD` | `7d` |
+
+啟動後自動開啟瀏覽器至 `http://localhost:7890`，每 60 秒自動重新整理。
+
+---
+
 ### `tt setup`
 
 安裝 AI 工具 hook 整合。
