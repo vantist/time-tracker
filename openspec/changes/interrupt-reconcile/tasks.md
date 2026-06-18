@@ -32,8 +32,8 @@
 
 ## 5. 驗證
 
-- [ ] 5.1 執行 `go build ./...` 確認全 package 無編譯錯誤（含 windows build tag）
-- [ ] 5.2 執行 `go test ./internal/transcript/...` 確認 extract 測試全過
-- [ ] 5.3 執行 `go test ./internal/reconcile/...` 確認 reconcile 測試全過
-- [ ] 5.4 執行 `go test ./cmd/tt/...` 確認 record.go 重構後現有測試全過
+- [x] 5.1 執行 `go build ./...` 確認全 package 無編譯錯誤（含 windows build tag）
+- [x] 5.2 執行 `go test ./internal/transcript/...` 確認 extract 測試全過
+- [x] 5.3 執行 `go test ./internal/reconcile/...` 確認 reconcile 測試全過
+- [x] 5.4 執行 `go test ./cmd/tt/...` 確認 record.go 重構後現有測試全過
 - [ ] 5.5 手動驗證：跑一個 Claude Code session → Escape 中斷 → 執行 `tt report` → 確認 token 與成本已補算
