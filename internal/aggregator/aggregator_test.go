@@ -59,7 +59,7 @@ func TestUserActiveTimeGapBelowThreshold(t *testing.T) {
 		{PromptAt: b.Add(30 * time.Minute)},  // gap 22m > 15m → NOT counted
 	}
 	// active time = gap(5m) + gap(3m) = 8 minutes
-	got := aggregator.UserActiveTime(turns, threshold)
+	got := aggregator.UserActiveTime(turns, time.Time{}, threshold)
 	want := 8 * time.Minute
 	if got != want {
 		t.Errorf("UserActiveTime = %v, want %v", got, want)
@@ -73,7 +73,7 @@ func TestUserActiveTimeGapAboveThreshold(t *testing.T) {
 		{PromptAt: b},
 		{PromptAt: b.Add(20 * time.Minute)}, // gap 20m > 15m → NOT counted
 	}
-	got := aggregator.UserActiveTime(turns, threshold)
+	got := aggregator.UserActiveTime(turns, time.Time{}, threshold)
 	if got != 0 {
 		t.Errorf("UserActiveTime = %v, want 0", got)
 	}
@@ -86,9 +86,39 @@ func TestUserActiveTimeCustomThreshold(t *testing.T) {
 		{PromptAt: b.Add(25 * time.Minute)},
 	}
 	// with threshold=30m, gap 25m < 30m → counted
-	got := aggregator.UserActiveTime(turns, 30*time.Minute)
+	got := aggregator.UserActiveTime(turns, time.Time{}, 30*time.Minute)
 	want := 25 * time.Minute
 	if got != want {
 		t.Errorf("UserActiveTime = %v, want %v", got, want)
+	}
+}
+
+func TestUserActiveTimeWithSessionStart(t *testing.T) {
+	b := base()
+	sessionStart := b.Add(-3 * time.Minute) // session started 3m before first prompt
+	turns := []aggregator.Turn{
+		{PromptAt: b},
+		{PromptAt: b.Add(4 * time.Minute)},
+	}
+	// sessionStart→first prompt = 3m, first→second = 4m, both < 15m
+	got := aggregator.UserActiveTime(turns, sessionStart, 15*time.Minute)
+	want := 7 * time.Minute
+	if got != want {
+		t.Errorf("UserActiveTime with sessionStart = %v, want %v", got, want)
+	}
+}
+
+func TestUserActiveTimeSessionStartExceedsThreshold(t *testing.T) {
+	b := base()
+	sessionStart := b.Add(-20 * time.Minute) // 20m before first prompt → exceeds 15m threshold
+	turns := []aggregator.Turn{
+		{PromptAt: b},
+		{PromptAt: b.Add(4 * time.Minute)},
+	}
+	// sessionStart→first prompt = 20m ≥ 15m → NOT counted; first→second = 4m → counted
+	got := aggregator.UserActiveTime(turns, sessionStart, 15*time.Minute)
+	want := 4 * time.Minute
+	if got != want {
+		t.Errorf("UserActiveTime sessionStart exceeds threshold = %v, want %v", got, want)
 	}
 }

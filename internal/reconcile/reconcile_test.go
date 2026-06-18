@@ -190,6 +190,37 @@ func TestReconcile_Idempotency(t *testing.T) {
 	}
 }
 
+// TestReconcile_StopHookWroteResponseAtButNoTokens: when Stop hook set response_at but tokens
+// are null (e.g. transcript reset after /clear), reconcile must backfill tokens.
+func TestReconcile_StopHookWroteResponseAtButNoTokens(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+
+	insertSession(t, db, "sess4", 0, 0)
+	transcriptPath := writeTranscriptLines(t, dir, []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":300,"output_tokens":120}}}`,
+	})
+
+	// Stop hook wrote response_at but tokens are null (tokensJSON was empty at fire time)
+	alreadySet := time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)
+	_, err := db.Exec(
+		`INSERT INTO turns (session_id, prompt_at, response_at, transcript_path, prompt_line_offset) VALUES (?, ?, ?, ?, ?)`,
+		"sess4", time.Now().Add(-2*time.Minute).UTC().Format(time.RFC3339), alreadySet, transcriptPath, 0,
+	)
+	if err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	reconcile(db)
+
+	var inputTokens sql.NullInt64
+	db.QueryRow("SELECT input_tokens FROM turns WHERE session_id='sess4'").Scan(&inputTokens)
+	if !inputTokens.Valid || inputTokens.Int64 != 300 {
+		t.Errorf("input_tokens = %v, want 300 (reconcile must backfill tokens even when response_at already set)", inputTokens)
+	}
+}
+
 // TestHasActiveSession: returns true when at least one session process is alive.
 func TestHasActiveSession(t *testing.T) {
 	db := newTestDB(t)

@@ -72,7 +72,7 @@ type GroupResult struct {
 }
 
 func Query(conn *sql.DB, opts Options) (Result, error) {
-	idleThreshold := 15 * time.Minute
+	idleThreshold := 10 * time.Minute
 	if v, err := config.Get("idle-threshold"); err == nil && v != "" {
 		if mins, err := strconv.Atoi(v); err == nil {
 			idleThreshold = time.Duration(mins) * time.Minute
@@ -240,9 +240,13 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	}
 
 	var totalAgent, totalUser time.Duration
-	for _, turns := range sessTurns {
+	for sid, turns := range sessTurns {
 		totalAgent += aggregator.AgentTime(turns)
-		totalUser += aggregator.UserActiveTime(turns, idleThreshold)
+		var sessStart time.Time
+		if ss := sessMap[sid]; ss != nil {
+			sessStart, _ = time.Parse(time.RFC3339, ss.startedAt)
+		}
+		totalUser += aggregator.UserActiveTime(turns, sessStart, idleThreshold)
 	}
 	res.AgentTimeSec = int64(totalAgent.Seconds())
 	res.UserActiveTimeSec = int64(totalUser.Seconds())
@@ -252,7 +256,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	// build ByProject sorted by sessions desc
 	for proj, ps := range projMap {
 		agentSec := int64(aggregator.AgentTime(ps.turns).Seconds())
-		userSec := int64(aggregator.UserActiveTime(ps.turns, idleThreshold).Seconds())
+		userSec := int64(aggregator.UserActiveTime(ps.turns, time.Time{}, idleThreshold).Seconds())
 		res.ByProject = append(res.ByProject, ProjectSummary{
 			Project:           proj,
 			SessionsCount:     len(ps.sessions),
@@ -268,7 +272,8 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	// build Sessions sorted by started_at desc
 	for sid, ss := range sessMap {
 		agentSec := int64(aggregator.AgentTime(sessTurns[sid]).Seconds())
-		userSec := int64(aggregator.UserActiveTime(sessTurns[sid], idleThreshold).Seconds())
+		sessStart, _ := time.Parse(time.RFC3339, ss.startedAt)
+		userSec := int64(aggregator.UserActiveTime(sessTurns[sid], sessStart, idleThreshold).Seconds())
 		res.Sessions = append(res.Sessions, SessionRow{
 			ID:           sid,
 			Project:      ss.project,
@@ -359,7 +364,7 @@ func groupByWorkItem(rows []rowData, sessTurns map[string][]aggregator.Turn, idl
 	var result []GroupResult
 	for label, g := range groups {
 		agentSec := int64(aggregator.AgentTime(g.turns).Seconds())
-		userSec := int64(aggregator.UserActiveTime(g.turns, idleThreshold).Seconds())
+		userSec := int64(aggregator.UserActiveTime(g.turns, time.Time{}, idleThreshold).Seconds())
 		result = append(result, GroupResult{
 			Label:             label,
 			SessionsCount:     len(g.sessions),

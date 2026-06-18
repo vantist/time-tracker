@@ -19,8 +19,14 @@ func AgentTime(turns []Turn) time.Duration {
 }
 
 // UserActiveTime sums inter-prompt gaps that are strictly less than idleThreshold.
-func UserActiveTime(turns []Turn, idleThreshold time.Duration) time.Duration {
+// If sessionStart is non-zero, the gap from sessionStart to the first prompt is also included.
+func UserActiveTime(turns []Turn, sessionStart time.Time, idleThreshold time.Duration) time.Duration {
 	var total time.Duration
+	if !sessionStart.IsZero() && len(turns) > 0 {
+		if gap := turns[0].PromptAt.Sub(sessionStart); gap >= 0 && gap < idleThreshold {
+			total += gap
+		}
+	}
 	for i := 1; i < len(turns); i++ {
 		gap := turns[i].PromptAt.Sub(turns[i-1].PromptAt)
 		if gap < idleThreshold {

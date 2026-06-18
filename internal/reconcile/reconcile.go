@@ -61,6 +61,7 @@ type danglingTurn struct {
 	transcriptPath   string
 	promptLineOffset int
 	promptAt         time.Time
+	responseAt       *time.Time // non-nil when Stop hook already set it
 	processPID       int64
 	processStart     int64
 	nextOffset       *int
@@ -71,6 +72,7 @@ func reconcile(conn *sql.DB) {
 	rows, err := conn.Query(`
 		SELECT
 			t.id, t.session_id, t.transcript_path, t.prompt_line_offset, t.prompt_at,
+			t.response_at,
 			s.process_pid, s.process_start,
 			(SELECT prompt_line_offset FROM turns t2
 			 WHERE t2.session_id = t.session_id AND t2.id > t.id
@@ -80,7 +82,7 @@ func reconcile(conn *sql.DB) {
 			 ORDER BY t2.id LIMIT 1) AS next_prompt_at
 		FROM turns t
 		JOIN sessions s ON s.id = t.session_id
-		WHERE t.response_at IS NULL
+		WHERE (t.response_at IS NULL OR t.input_tokens IS NULL)
 		  AND t.transcript_path IS NOT NULL
 		  AND t.prompt_line_offset IS NOT NULL
 	`)
@@ -94,8 +96,10 @@ func reconcile(conn *sql.DB) {
 		var nextOffset sql.NullInt64
 		var nextPromptAtStr sql.NullString
 		var promptAtStr string
+		var responseAtStr sql.NullString
 		err := rows.Scan(
 			&dt.id, &dt.sessionID, &dt.transcriptPath, &dt.promptLineOffset, &promptAtStr,
+			&responseAtStr,
 			&dt.processPID, &dt.processStart,
 			&nextOffset, &nextPromptAtStr,
 		)
@@ -103,6 +107,12 @@ func reconcile(conn *sql.DB) {
 			continue
 		}
 		dt.promptAt, _ = time.Parse(time.RFC3339Nano, promptAtStr)
+		if responseAtStr.Valid {
+			t, err := time.Parse(time.RFC3339Nano, responseAtStr.String)
+			if err == nil {
+				dt.responseAt = &t
+			}
+		}
 		if nextOffset.Valid {
 			v := int(nextOffset.Int64)
 			dt.nextOffset = &v
@@ -133,31 +143,41 @@ func reconcile(conn *sql.DB) {
 			continue
 		}
 
-		var responseAt time.Time
-		if dt.nextPromptAt != nil {
-			responseAt = dt.nextPromptAt.Add(-time.Millisecond)
-		} else {
-			info, err := os.Stat(dt.transcriptPath)
-			if err != nil {
-				continue
-			}
-			responseAt = info.ModTime()
-		}
-
 		tokens := parseTokensJSON(tokensJSON)
 		var cost *float64
 		if model != "" {
 			cost = pricing.Calculate(model, tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate)
 		}
 
-		conn.Exec(
-			`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=?
-			 WHERE id=? AND response_at IS NULL`,
-			responseAt.UTC().Format(time.RFC3339Nano),
-			tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate,
-			cost,
-			dt.id,
-		)
+		if dt.responseAt != nil {
+			// Stop hook already wrote response_at — only backfill missing tokens.
+			conn.Exec(
+				`UPDATE turns SET input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=?
+				 WHERE id=? AND input_tokens IS NULL`,
+				tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate,
+				cost,
+				dt.id,
+			)
+		} else {
+			var responseAt time.Time
+			if dt.nextPromptAt != nil {
+				responseAt = dt.nextPromptAt.Add(-time.Millisecond)
+			} else {
+				info, err := os.Stat(dt.transcriptPath)
+				if err != nil {
+					continue
+				}
+				responseAt = info.ModTime()
+			}
+			conn.Exec(
+				`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=?
+				 WHERE id=? AND response_at IS NULL`,
+				responseAt.UTC().Format(time.RFC3339Nano),
+				tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate,
+				cost,
+				dt.id,
+			)
+		}
 	}
 }
 
