@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2](https://github.com/vantist/time-tracker/compare/v1.3.1...v1.3.2) (2026-06-18)
+
+
+### Bug Fixes
+
+* **install:** 修正安裝腳本中的儲存庫名稱 ([a6b406a](https://github.com/vantist/time-tracker/commit/a6b406a251a9c3ba85297f3a06b4e63ed16f476e))
+
 ## [1.3.1](https://github.com/vantist/time-checker/compare/v1.3.0...v1.3.1) (2026-06-18)
 
 
