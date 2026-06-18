@@ -2,7 +2,8 @@
 set -e
 
 REPO="vantist/time-checker"
-BIN="/usr/local/bin/tt"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+BIN="$INSTALL_DIR/tt"
 
 OS=$(uname -s)
 ARCH=$(uname -m)
@@ -28,11 +29,17 @@ TAG=$(curl -s "https://api.github.com/repos/${REPO}/releases/latest" | grep '"ta
 URL="https://github.com/${REPO}/releases/download/${TAG}/${ARTIFACT}"
 
 echo "Installing tt ${TAG} (${ARTIFACT})..."
+mkdir -p "$INSTALL_DIR"
 curl -fsSL "$URL" -o /tmp/tt
 chmod +x /tmp/tt
 mv /tmp/tt "$BIN"
 
 # ponytail: suppress xattr error if attr not present (fresh binary won't have it)
 xattr -d com.apple.quarantine "$BIN" 2>/dev/null || true
+
+case ":$PATH:" in
+  *":$INSTALL_DIR:"*) ;;
+  *) echo "Add to PATH: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+esac
 
 echo "Installed: $("$BIN" version)"
