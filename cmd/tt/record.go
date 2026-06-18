@@ -22,6 +22,7 @@ func init() {
 	recordPromptCmd.Flags().String("project", "", "project path (overrides stdin)")
 	recordPromptCmd.Flags().String("tool", "claude-code", "tool name")
 	recordPromptCmd.Flags().String("model", "", "model name (overrides stdin)")
+	recordPromptCmd.Flags().String("transcript-path", "", "transcript JSONL path (overrides stdin)")
 
 	recordResponseCmd.Flags().String("session", "", "session ID (overrides stdin)")
 	recordResponseCmd.Flags().String("tokens", "", "tokens JSON string (overrides stdin)")
@@ -143,6 +144,7 @@ func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
 	project, _ := cmd.Flags().GetString("project")
 	tool, _ := cmd.Flags().GetString("tool")
 	model, _ := cmd.Flags().GetString("model")
+	transcriptPath, _ := cmd.Flags().GetString("transcript-path")
 
 	if stdin != nil {
 		if sessionID == "" {
@@ -154,17 +156,21 @@ func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
 		if model == "" {
 			model = stdin.Model
 		}
+		if transcriptPath == "" {
+			transcriptPath = stdin.TranscriptPath
+		}
 	}
 
 	envInput, _ := resolvePromptInputFromEnv()
 
 	return recorder.PromptInput{
-		SessionID:    sessionID,
-		Project:      project,
-		Tool:         tool,
-		Model:        model,
-		ProcessPID:   envInput.ProcessPID,
-		ProcessStart: envInput.ProcessStart,
+		SessionID:      sessionID,
+		Project:        project,
+		Tool:           tool,
+		Model:          model,
+		ProcessPID:     envInput.ProcessPID,
+		ProcessStart:   envInput.ProcessStart,
+		TranscriptPath: transcriptPath,
 	}, nil
 }
 
