@@ -4,7 +4,7 @@
 - [x] 1.2 建立 `internal/transcript/extract.go`，將 `loadTranscript`、`sumWindow`、`extractFromTranscriptAtOffset`（改名 `ExtractWindow`）移入，export 為公開函式
 - [x] 1.3 將 `extractSubagentTokens` 移入 `internal/transcript/extract.go`，確認路徑邏輯獨立於 cmd 層
 - [x] 1.4 寫 `internal/transcript/extract_test.go`：測試 `ExtractWindow` 在 from/to 範圍正確、to=-1 讀到 EOF、路徑不存在時回傳 error（TDD：先寫 failing test）
-- [ ] 1.5 修改 `cmd/tt/record.go` 改 import `internal/transcript`，刪本地重複實作，確認現有測試通過
+- [x] 1.5 修改 `cmd/tt/record.go` 改 import `internal/transcript`，刪本地重複實作，確認現有測試通過
 
 ## 2. 建立 internal/reconcile package（鎖機制）
 

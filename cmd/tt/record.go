@@ -14,6 +14,7 @@ import (
 	"github.com/user/tt/internal/db"
 	"github.com/user/tt/internal/process"
 	"github.com/user/tt/internal/recorder"
+	"github.com/user/tt/internal/transcript"
 )
 
 func init() {
@@ -263,51 +264,10 @@ func resolveTokensFromTranscript(conn *sql.DB, sessionID, transcriptPath string)
 	return extractFromTranscript(transcriptPath)
 }
 
-// extractFromTranscriptAtOffset decodes the full transcript then sums only the
-// assistant entries at index >= offset (the anchor recorded at prompt time).
-// Model is resolved from the last non-sidechain assistant entry in the full file.
+// extractFromTranscriptAtOffset extracts token usage from offset to EOF.
 func extractFromTranscriptAtOffset(path string, offset int) (tokensJSON, model string) {
-	all := loadTranscript(path)
-	if len(all) == 0 {
-		return "", ""
-	}
-
-	// Model from last non-sidechain assistant entry (whole transcript).
-	for i := len(all) - 1; i >= 0; i-- {
-		e := all[i]
-		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
-			model = e.Message.Model
-			break
-		}
-	}
-
-	// Clamp offset; if beyond end, nothing to sum.
-	if offset > len(all) {
-		offset = len(all)
-	}
-
-	acc := sumWindow(all, offset, len(all))
-
-	sub := extractSubagentTokens(path, all, offset)
-	acc.InputTokens += sub.InputTokens
-	acc.OutputTokens += sub.OutputTokens
-	acc.CacheReadInputTokens += sub.CacheReadInputTokens
-	acc.CacheCreationInputTokens += sub.CacheCreationInputTokens
-
-	if acc.InputTokens == 0 && acc.OutputTokens == 0 {
-		return "", model
-	}
-
-	out, err := json.Marshal(map[string]int{
-		"input_tokens":          acc.InputTokens,
-		"output_tokens":         acc.OutputTokens,
-		"cache_read_tokens":     acc.CacheReadInputTokens,
-		"cache_creation_tokens": acc.CacheCreationInputTokens,
-	})
-	if err != nil {
-		return "", model
-	}
-	return string(out), model
+	tokensJSON, model, _ = transcript.ExtractWindow(path, offset, -1)
+	return
 }
 
 // loadTranscript opens and decodes all entries from a JSONL transcript file.
