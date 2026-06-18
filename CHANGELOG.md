@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/vantist/time-checker/compare/v1.3.0...v1.3.1) (2026-06-18)
+
+
+### Bug Fixes
+
+* **workflow:** 修正自動合併釋出 PR 的命令選項 ([bfe8344](https://github.com/vantist/time-checker/commit/bfe8344defeff227233abca45284da7b032dc81f))
+
 ## [1.3.0](https://github.com/vantist/time-checker/compare/v1.2.0...v1.3.0) (2026-06-18)
 
 
