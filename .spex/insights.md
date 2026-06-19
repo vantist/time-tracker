@@ -1,5 +1,25 @@
 # Spex Insights
 
+## [spex-apply] fix-session-token-tracking — 2026-06-19
+
+### Promote candidates
+
+- [ ] subagent usageFields aggregation — 모든 필드 전파 필수 (`Ephemeral5m/1h` 포함)
+  > **Why**: `extractSubagentTokens`에서 `sumSubagentWindow` 반환값의 `CacheCreation.Ephemeral5m/1h`를 acc에 더하지 않아 subagent 캐시 토큰이 완전히 소실됐다. 4개 기본 필드만 복사하고 새 필드를 빠뜨리는 패턴.
+  > **How to apply**: usageFields에 필드 추가 시 반드시 모든 aggregation 지점(sumWindow caller, extractSubagentTokens caller)에서 해당 필드도 더하는지 grep으로 확인.
+
+- [ ] fallback window 범위를 변수로 추출 — `winFrom, winTo` 패턴
+  > **Why**: /clear fallback 시 `acc`는 `prevUserIdx+1..lastUserIdx` 범위로 재계산했지만 `extractSubagentTokens`는 여전히 원래 `lastUserIdx+1..len(all)` 를 사용 — 빈 창에서 subagent를 찾게 돼 tokens 유실.
+  > **How to apply**: primary/fallback 창 범위를 `winFrom, winTo` 변수로 추출한 후 `sumWindow`와 `extractSubagentTokens` 둘 다 같은 변수로 호출.
+
+- [ ] JSON→DB 직렬화 경계에서 새 필드 체크리스트
+  > **Why**: `marshalWindowResult`, `tokenPayload` struct, UPDATE SQL 세 곳에 각각 필드를 추가해야 하는데 하나라도 빠지면 조용히 손실. code review 에서야 발견.
+  > **How to apply**: Stop hook 경로의 토큰 흐름: `WindowResult` → `marshalWindowResult` (map) → `tokenPayload` (JSON) → `conn.Exec UPDATE SQL`. 새 필드 추가 시 4단계 모두 체크.
+
+**Plan deviations:** none
+
+---
+
 ## [spex-apply] fix-user-time-semantics — 2026-06-19
 
 ### Promote candidates
@@ -86,9 +106,9 @@
 
 **Promote candidates:**
 
-- [ ] `bufio.Scanner` is unsafe for JSONL line counting — use `io.ReadAll` + `bytes.Count`
-  > **Why**: Claude transcript lines can embed large tool_result payloads exceeding Scanner's 64 KB default, silently truncating the count and storing a wrong `prompt_line_offset` that causes token double-counting.
-  > **How to apply**: Any line-counting function over JSONL/transcript files: use `bytes.Count(data, []byte("\n"))` after `io.ReadAll`, not `bufio.Scanner`.
+- [x] `bufio.Scanner` for JSONL requires explicit 1MB buffer — `sc.Buffer(make([]byte, 64*1024), 1024*1024)`
+  > **Why**: Default 64KB Scanner token limit silently stops on large lines (image tool results, large tool outputs). With 1MB buffer cap it handles real transcripts. `io.ReadAll` loads entire file into memory which is worse for large sessions.
+  > **How to apply**: `bufio.NewScanner` + `sc.Buffer(make([]byte, 64*1024), 1024*1024)` for any JSONL line counting. The 1MB cap matches Claude Code's practical max line size.
 
 - [ ] Pass an already-open DB conn into helpers rather than calling `db.Open()` a second time
   > **Why**: Two sequential `db.Open()` calls per hook invocation; each open acquires a file lock and runs migrate(). Redundant overhead on every Stop event.
