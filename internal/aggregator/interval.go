@@ -15,7 +15,8 @@ func UserIntervals(turns []Turn, sessionStart time.Time, idleThreshold time.Dura
 	var result []Interval
 
 	keep := func(iv Interval) {
-		if iv.End.Sub(iv.Start) < idleThreshold {
+		d := iv.End.Sub(iv.Start)
+		if d > 0 && d < idleThreshold {
 			result = append(result, iv)
 		}
 	}
