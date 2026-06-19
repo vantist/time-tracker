@@ -47,6 +47,21 @@ func newTestDB(t *testing.T) *sql.DB {
 			cache_creation_1h_tokens INTEGER,
 			subagent_tokens_settled BOOLEAN DEFAULT 0
 		);
+		CREATE TABLE turn_model_usages (
+			id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+			turn_id                     INTEGER NOT NULL REFERENCES turns(id) ON DELETE CASCADE,
+			model                       TEXT NOT NULL,
+			is_subagent                 BOOLEAN NOT NULL DEFAULT 0,
+			input_tokens                INTEGER NOT NULL DEFAULT 0,
+			output_tokens               INTEGER NOT NULL DEFAULT 0,
+			cache_read_tokens           INTEGER NOT NULL DEFAULT 0,
+			cache_creation_tokens       INTEGER NOT NULL DEFAULT 0,
+			cache_creation_5m_tokens    INTEGER NOT NULL DEFAULT 0,
+			cache_creation_1h_tokens    INTEGER NOT NULL DEFAULT 0,
+			estimated_cost_usd          REAL NOT NULL DEFAULT 0.0,
+			UNIQUE(turn_id, model, is_subagent)
+		);
+		CREATE INDEX idx_turn_model_usages_turn_id ON turn_model_usages(turn_id);
 	`)
 	if err != nil {
 		t.Fatalf("create tables: %v", err)
@@ -316,5 +331,109 @@ func TestHasActiveSession_NoAlive(t *testing.T) {
 
 	if HasActiveSession(db) {
 		t.Error("HasActiveSession = true, want false (no alive processes)")
+	}
+}
+
+func TestReconcile_TurnModelUsages(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+
+	insertSession(t, db, "sess_u2", 0, 0)
+
+	// Create a subagent directory
+	transcriptPath := writeTranscriptLines(t, dir, []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"tool_use","id":"toolu_rec1","name":"Agent"}]}}`,
+	})
+
+	subDir := filepath.Join(dir, "transcript", "subagents")
+	os.MkdirAll(subDir, 0755)
+	os.WriteFile(filepath.Join(subDir, "agent-rec.meta.json"),
+		[]byte(`{"toolUseId":"toolu_rec1"}`), 0644)
+	os.WriteFile(filepath.Join(subDir, "agent-rec.jsonl"),
+		[]byte(`{"type":"assistant","isSidechain":true,"message":{"model":"claude-haiku-4-5","usage":{"input_tokens":100,"output_tokens":50}}}`+"\n"), 0644)
+
+	// Turn has response_at but subagent_tokens_settled = 0
+	promptAt := time.Now().Add(-10 * time.Minute)
+	turnID := insertTurn(t, db, "sess_u2", transcriptPath, 0, promptAt)
+
+	// Insert an old detail in turn_model_usages to verify it gets replaced (e.g. model gpt-4)
+	_, err := db.Exec(`INSERT INTO turn_model_usages (turn_id, model, is_subagent, input_tokens) VALUES (?, 'gpt-4', 0, 999)`, turnID)
+	if err != nil {
+		t.Fatalf("failed to insert old model usage: %v", err)
+	}
+
+	reconcile(db)
+
+	// Check turn_model_usages
+	rows, err := db.Query("SELECT model, is_subagent, input_tokens, output_tokens, estimated_cost_usd FROM turn_model_usages WHERE turn_id=? ORDER BY is_subagent ASC", turnID)
+	if err != nil {
+		t.Fatalf("query turn_model_usages: %v", err)
+	}
+	defer rows.Close()
+
+	type usage struct {
+		model      string
+		isSubagent bool
+		input      int
+		output     int
+		cost       float64
+	}
+	var results []usage
+	for rows.Next() {
+		var u usage
+		rows.Scan(&u.model, &u.isSubagent, &u.input, &u.output, &u.cost)
+		results = append(results, u)
+	}
+
+	// Expect 2 usages:
+	// 1. main agent: claude-sonnet-4-6 (is_subagent=false, input=10, output=5)
+	// 2. subagent: claude-haiku-4-5 (is_subagent=true, input=100, output=50)
+	if len(results) != 2 {
+		t.Fatalf("expected 2 usages, got %d: %+v", len(results), results)
+	}
+
+	var mainU, subU usage
+	for _, r := range results {
+		if !r.isSubagent {
+			mainU = r
+		} else {
+			subU = r
+		}
+	}
+
+	if mainU.model != "claude-sonnet-4-6" || mainU.input != 10 || mainU.output != 5 {
+		t.Errorf("expected main usage claude-sonnet-4-6 (10, 5), got %+v", mainU)
+	}
+	if subU.model != "claude-haiku-4-5" || subU.input != 100 || subU.output != 50 {
+		t.Errorf("expected subagent usage claude-haiku-4-5 (100, 50), got %+v", subU)
+	}
+
+	// The old gpt-4 usage must be deleted/replaced
+	for _, r := range results {
+		if r.model == "gpt-4" {
+			t.Error("old gpt-4 usage was not deleted")
+		}
+	}
+
+	// Verify turns table is updated with pre-aggregated sum
+	var turnInput, turnOutput int
+	var turnCost float64
+	var settled bool
+	db.QueryRow("SELECT input_tokens, output_tokens, estimated_cost_usd, subagent_tokens_settled FROM turns WHERE id=?", turnID).Scan(&turnInput, &turnOutput, &turnCost, &settled)
+
+	if turnInput != 110 || turnOutput != 55 {
+		t.Errorf("turns pre-aggregated totals mismatch: got input=%d, output=%d", turnInput, turnOutput)
+	}
+	if !settled {
+		t.Error("turns.subagent_tokens_settled should be true/1")
+	}
+
+	// Cost:
+	// Sonnet: 10/1e6 * 3.00 + 5/1e6 * 15.00 = 0.00003 + 0.000075 = 0.000105
+	// Haiku: 100/1e6 * 1.00 + 50/1e6 * 5.00 = 0.000100 + 0.000250 = 0.000350
+	// Total cost = 0.000455
+	if turnCost < 0.000454 || turnCost > 0.000456 {
+		t.Errorf("turns cost pre-aggregated sum wrong: %f, want ~0.000455", turnCost)
 	}
 }

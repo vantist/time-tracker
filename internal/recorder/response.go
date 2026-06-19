@@ -53,9 +53,22 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
 		cost = pricing.Calculate(sessionModel, tok.InputTokens, tok.OutputTokens, tok.CacheReadTokens, tok.CacheCreationTokens, tok.CacheCreate5m, tok.CacheCreate1h)
 	}
 
-	// Update the latest turn for this session (highest rowid).
-	// subagent_tokens_settled=0 signals reconcile to re-compute after process exits.
-	_, err := conn.Exec(`
+	tx, err := conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	var turnID int64
+	err = tx.QueryRow("SELECT id FROM turns WHERE session_id=? AND response_at IS NULL ORDER BY id DESC LIMIT 1", stableID).Scan(&turnID)
+	if err == sql.ErrNoRows {
+		return nil // silently skip
+	} else if err != nil {
+		return err
+	}
+
+	// Update the turn
+	_, err = tx.Exec(`
 		UPDATE turns SET
 			response_at                = ?,
 			input_tokens               = CASE WHEN ? > 0 THEN ? ELSE input_tokens END,
@@ -66,9 +79,7 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
 			cache_creation_1h_tokens   = ?,
 			estimated_cost_usd         = ?,
 			subagent_tokens_settled    = 0
-		WHERE id = (
-			SELECT id FROM turns WHERE session_id=? ORDER BY id DESC LIMIT 1
-		)`,
+		WHERE id = ?`,
 		now.Format(time.RFC3339),
 		tok.InputTokens, tok.InputTokens,
 		tok.OutputTokens, tok.OutputTokens,
@@ -77,7 +88,36 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
 		tok.CacheCreate5m,
 		tok.CacheCreate1h,
 		cost,
-		stableID,
+		turnID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+
+	// Write main agent usage to turn_model_usages
+	var costVal float64
+	if cost != nil {
+		costVal = *cost
+	}
+	_, err = tx.Exec(`
+		INSERT OR REPLACE INTO turn_model_usages (
+			turn_id, model, is_subagent,
+			input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+			cache_creation_5m_tokens, cache_creation_1h_tokens, estimated_cost_usd
+		) VALUES (?, ?, 0, ?, ?, ?, ?, ?, ?, ?)`,
+		turnID,
+		sessionModel,
+		tok.InputTokens,
+		tok.OutputTokens,
+		tok.CacheReadTokens,
+		tok.CacheCreationTokens,
+		tok.CacheCreate5m,
+		tok.CacheCreate1h,
+		costVal,
+	)
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

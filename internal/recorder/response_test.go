@@ -197,3 +197,54 @@ func TestRecordResponseEmptyTokensNoError(t *testing.T) {
 		t.Error("response_at must be set even with empty tokens")
 	}
 }
+
+func TestRecordResponseWritesModelUsages(t *testing.T) {
+	conn := openTestDB(t)
+
+	if err := recorder.RecordPrompt(conn, recorder.PromptInput{
+		SessionID: "sess-u1",
+		Project:   "/proj",
+		Tool:      "claude-code",
+		Model:     "claude-sonnet-4-6",
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	tokensJSON := `{"input_tokens":1000,"output_tokens":200,"cache_read_tokens":500,"cache_creation_tokens":0}`
+	if err := recorder.RecordResponse(conn, "sess-u1", tokensJSON, "claude-sonnet-4-6"); err != nil {
+		t.Fatalf("RecordResponse: %v", err)
+	}
+
+	var count int
+	conn.QueryRow("SELECT COUNT(*) FROM turn_model_usages").Scan(&count)
+	if count != 1 {
+		t.Errorf("expected 1 turn_model_usages entry, got %d", count)
+	}
+
+	var turnID int64
+	var model string
+	var isSubagent bool
+	var inputTok, outputTok, cacheRead, cacheCreate int
+	var cost float64
+	err := conn.QueryRow(`
+		SELECT turn_id, model, is_subagent, input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens, estimated_cost_usd
+		FROM turn_model_usages
+	`).Scan(&turnID, &model, &isSubagent, &inputTok, &outputTok, &cacheRead, &cacheCreate, &cost)
+	if err != nil {
+		t.Fatalf("failed to query turn_model_usages: %v", err)
+	}
+
+	if model != "claude-sonnet-4-6" {
+		t.Errorf("expected model claude-sonnet-4-6, got %q", model)
+	}
+	if isSubagent {
+		t.Error("expected is_subagent = false, got true")
+	}
+	if inputTok != 1000 || outputTok != 200 || cacheRead != 500 || cacheCreate != 0 {
+		t.Errorf("tokens mismatch in turn_model_usages: %d, %d, %d, %d", inputTok, outputTok, cacheRead, cacheCreate)
+	}
+	// cost calculation: (1000/1e6)*3.00 + (200/1e6)*15.00 + (500/1e6)*0.30 = 0.00615
+	if cost < 0.00614 || cost > 0.00616 {
+		t.Errorf("cost mismatch in turn_model_usages: %f", cost)
+	}
+}
