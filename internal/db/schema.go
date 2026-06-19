@@ -66,7 +66,65 @@ func migrate(db *sql.DB) error {
 	if err := addSessionColumns(db); err != nil {
 		return err
 	}
-	return addTurnColumns(db)
+	if err := addTurnColumns(db); err != nil {
+		return err
+	}
+	return setupTurnModelUsages(db)
+}
+
+func setupTurnModelUsages(db *sql.DB) error {
+	if _, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS turn_model_usages (
+			id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+			turn_id                     INTEGER NOT NULL REFERENCES turns(id) ON DELETE CASCADE,
+			model                       TEXT NOT NULL,
+			is_subagent                 BOOLEAN NOT NULL DEFAULT 0,
+			input_tokens                INTEGER NOT NULL DEFAULT 0,
+			output_tokens               INTEGER NOT NULL DEFAULT 0,
+			cache_read_tokens           INTEGER NOT NULL DEFAULT 0,
+			cache_creation_tokens       INTEGER NOT NULL DEFAULT 0,
+			cache_creation_5m_tokens    INTEGER NOT NULL DEFAULT 0,
+			cache_creation_1h_tokens    INTEGER NOT NULL DEFAULT 0,
+			estimated_cost_usd          REAL NOT NULL DEFAULT 0.0,
+			UNIQUE(turn_id, model, is_subagent)
+		);
+		CREATE INDEX IF NOT EXISTS idx_turn_model_usages_turn_id ON turn_model_usages(turn_id);
+	`); err != nil {
+		return err
+	}
+
+	// Backfill existing turns
+	_, err := db.Exec(`
+		INSERT INTO turn_model_usages (
+			turn_id,
+			model,
+			is_subagent,
+			input_tokens,
+			output_tokens,
+			cache_read_tokens,
+			cache_creation_tokens,
+			cache_creation_5m_tokens,
+			cache_creation_1h_tokens,
+			estimated_cost_usd
+		)
+		SELECT 
+			t.id,
+			COALESCE(NULLIF(t.model, ''), NULLIF(s.model, ''), 'unknown'),
+			0,
+			COALESCE(t.input_tokens, 0),
+			COALESCE(t.output_tokens, 0),
+			COALESCE(t.cache_read_tokens, 0),
+			COALESCE(t.cache_creation_tokens, 0),
+			COALESCE(t.cache_creation_5m_tokens, 0),
+			COALESCE(t.cache_creation_1h_tokens, 0),
+			COALESCE(t.estimated_cost_usd, 0.0)
+		FROM turns t
+		LEFT JOIN sessions s ON t.session_id = s.id
+		WHERE NOT EXISTS (
+			SELECT 1 FROM turn_model_usages u WHERE u.turn_id = t.id
+		);
+	`)
+	return err
 }
 
 // addTurnColumns adds transcript_path and prompt_line_offset to turns
