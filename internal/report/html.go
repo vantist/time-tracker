@@ -79,33 +79,30 @@ tr:hover td { background: #1a2234; }
 <div class="status" id="status"></div>
 
 <script>
-function fmt(n) { return (n||0).toLocaleString(); }
-function fmtTime(sec) {
-  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
-  return h > 0 ? h+'h '+m+'m' : m+'m';
-}
-function fmtCost(c) { return c == null ? 'N/A' : '$'+c.toFixed(4); }
-function esc(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
+const fmt = n => (n || 0).toLocaleString();
+const fmtTime = sec => {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+  return h > 0 ? h + 'h ' + m + 'm' : m + 'm';
+};
+const fmtCost = c => c == null ? 'N/A' : '$' + c.toFixed(4);
+const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function render(d) {
   document.getElementById('v-sessions').textContent = d.sessions_count || 0;
-  document.getElementById('v-agent').textContent = fmtTime(d.agent_time_sec||0);
-  document.getElementById('v-user').textContent = fmtTime(d.user_active_time_sec||0);
+  document.getElementById('v-agent').textContent = fmtTime(d.agent_time_sec || 0);
+  document.getElementById('v-user').textContent = fmtTime(d.user_active_time_sec || 0);
   document.getElementById('v-input').textContent = fmt(d.input_tokens);
   document.getElementById('v-output').textContent = fmt(d.output_tokens);
   document.getElementById('v-cache-read').textContent = fmt(d.cache_read_tokens);
   document.getElementById('v-cache-create').textContent = fmt(d.cache_creation_tokens);
   document.getElementById('v-cost').textContent = fmtCost(d.estimated_cost_usd);
 
-  // daily chart
   const daily = d.daily || [];
-  const maxSess = Math.max(1, ...daily.map(x=>x.sessions));
+  const maxSess = Math.max(1, ...daily.map(x => x.sessions));
   const chart = document.getElementById('chart');
   chart.innerHTML = '';
-  daily.forEach(function(day) {
-    const pct = Math.round((day.sessions/maxSess)*100);
+  daily.forEach(day => {
+    const pct = Math.round((day.sessions / maxSess) * 100);
     const wrap = document.createElement('div'); wrap.className = 'bar-wrap';
     const bar = document.createElement('div'); bar.className = 'bar';
     bar.style.height = pct + '%';
@@ -115,34 +112,31 @@ function render(d) {
     chart.appendChild(wrap);
   });
 
-  // by-project table
   const projBody = document.getElementById('tbl-project');
   projBody.innerHTML = '';
-  (d.by_project||[]).forEach(function(p) {
+  (d.by_project || []).forEach(p => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+esc(p.project)+'</td><td>'+p.sessions+'</td><td>'+fmtTime(p.agent_time_seconds||0)+'</td><td>'+fmtTime(p.user_active_time_sec||0)+'</td><td>'+fmt(p.input_tokens)+' / '+fmt(p.output_tokens)+'</td><td>'+fmtCost(p.cost_usd)+'</td>';
+    tr.innerHTML = '<td>' + esc(p.project) + '</td><td>' + p.sessions + '</td><td>' + fmtTime(p.agent_time_seconds || 0) + '</td><td>' + fmtTime(p.user_active_time_sec || 0) + '</td><td>' + fmt(p.input_tokens) + ' / ' + fmt(p.output_tokens) + '</td><td>' + fmtCost(p.cost_usd) + '</td>';
     projBody.appendChild(tr);
   });
 
-  // by-work-item table
   const groups = d.groups || [];
   const wiSection = document.getElementById('section-workitem');
   wiSection.style.display = groups.length <= 1 ? 'none' : '';
   const wiBody = document.getElementById('tbl-workitem');
   wiBody.innerHTML = '';
-  groups.forEach(function(g) {
+  groups.forEach(g => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+esc(g.label)+'</td><td>'+esc(g.project)+'</td><td>'+(g.sessions_count||0)+'</td><td>'+fmtTime(g.agent_time_sec||0)+'</td><td>'+fmtTime(g.user_active_time_sec||0)+'</td><td>'+fmtCost(g.estimated_cost_usd)+'</td>';
+    tr.innerHTML = '<td>' + esc(g.label) + '</td><td>' + esc(g.project) + '</td><td>' + (g.sessions_count || 0) + '</td><td>' + fmtTime(g.agent_time_sec || 0) + '</td><td>' + fmtTime(g.user_active_time_sec || 0) + '</td><td>' + fmtCost(g.estimated_cost_usd) + '</td>';
     wiBody.appendChild(tr);
   });
 
-  // sessions table
   const sessBody = document.getElementById('tbl-sessions');
   sessBody.innerHTML = '';
-  (d.sessions||[]).forEach(function(s) {
+  (d.sessions || []).forEach(s => {
     const tr = document.createElement('tr');
-    const t = new Date(s.started_at||0);
-    tr.innerHTML = '<td>'+t.toLocaleString()+'</td><td>'+esc(s.project)+'</td><td>'+esc(s.branch)+'</td><td>'+esc(s.model)+'</td><td>'+(s.turns||0)+'</td><td>'+fmtTime(s.agent_time_sec||0)+'</td><td>'+fmtTime(s.user_time_sec||0)+'</td><td>'+esc(s.work_item)+'</td><td>'+fmtCost(s.cost_usd)+'</td>';
+    const t = new Date(s.started_at || 0);
+    tr.innerHTML = '<td>' + t.toLocaleString() + '</td><td>' + esc(s.project) + '</td><td>' + esc(s.branch) + '</td><td>' + esc(s.model) + '</td><td>' + (s.turns || 0) + '</td><td>' + fmtTime(s.agent_time_sec || 0) + '</td><td>' + fmtTime(s.user_time_sec || 0) + '</td><td>' + esc(s.work_item) + '</td><td>' + fmtCost(s.cost_usd) + '</td>';
     sessBody.appendChild(tr);
   });
 
@@ -150,7 +144,10 @@ function render(d) {
 }
 
 function load() {
-  fetch('/api/report').then(function(r){ return r.json(); }).then(render).catch(function(e){ console.error('fetch error', e); });
+  fetch('/api/report')
+    .then(r => r.json())
+    .then(render)
+    .catch(e => console.error('fetch error', e));
 }
 
 load();

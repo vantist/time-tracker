@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -66,14 +68,11 @@ var reportCmd = &cobra.Command{
 
 func parseSince(s string) (time.Time, error) {
 	now := time.Now().UTC()
-	// Try duration format: 7d, 30d
-	if len(s) > 1 && s[len(s)-1] == 'd' {
-		var days int
-		if _, err := fmt.Sscanf(s, "%dd", &days); err == nil {
+	if strings.HasSuffix(s, "d") {
+		if days, err := strconv.Atoi(s[:len(s)-1]); err == nil {
 			return now.AddDate(0, 0, -days), nil
 		}
 	}
-	// Try date format: YYYY-MM-DD
 	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
 		return time.Time{}, fmt.Errorf("expected NNd or YYYY-MM-DD, got %q", s)

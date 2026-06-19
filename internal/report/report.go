@@ -34,20 +34,20 @@ type SessionRow struct {
 }
 
 type Result struct {
-	Empty                bool
-	SessionsCount        int
-	AgentTimeSec         int64
-	UserActiveTimeSec    int64
-	InputTokens          int64
-	OutputTokens         int64
-	CacheReadTokens      int64
-	CacheCreationTokens  int64
-	EstimatedCostUSD     *float64
-	Groups               []GroupResult    // always populated, sorted by AgentTimeSec desc
-	ByProject            []ProjectSummary // grouped by session.project
-	Daily                []DailyStat      // last 7 days
-	Sessions             []SessionRow     // all sessions in range, newest first
-	ByWorkItem           bool
+	Empty                bool             `json:"-"`
+	SessionsCount        int              `json:"sessions_count"`
+	AgentTimeSec         int64            `json:"agent_time_sec"`
+	UserActiveTimeSec    int64            `json:"user_active_time_sec"`
+	InputTokens          int64            `json:"input_tokens"`
+	OutputTokens         int64            `json:"output_tokens"`
+	CacheReadTokens      int64            `json:"cache_read_tokens"`
+	CacheCreationTokens  int64            `json:"cache_creation_tokens"`
+	EstimatedCostUSD     *float64         `json:"estimated_cost_usd"`
+	Groups               []GroupResult    `json:"groups"`
+	ByProject            []ProjectSummary `json:"by_project"`
+	Daily                []DailyStat      `json:"daily"`
+	Sessions             []SessionRow     `json:"sessions"`
+	ByWorkItem           bool             `json:"-"`
 }
 
 type ProjectSummary struct {
@@ -173,6 +173,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	projMap := map[string]*projState{}
 	// date → DailyStat
 	dailyMap := map[string]*DailyStat{}
+	sessDateSeen := map[string]struct{}{} // "date:sessID"
 
 	for _, r := range allRows {
 		sessTurns[r.sessionID] = append(sessTurns[r.sessionID], aggregator.Turn{
@@ -183,13 +184,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		res.OutputTokens += r.outputTok
 		res.CacheReadTokens += r.cacheRead
 		res.CacheCreationTokens += r.cacheCreate
-		if r.cost != nil {
-			if res.EstimatedCostUSD == nil {
-				v := 0.0
-				res.EstimatedCostUSD = &v
-			}
-			*res.EstimatedCostUSD += *r.cost
-		}
+		addCost(&res.EstimatedCostUSD, r.cost)
 
 		// per-session accumulation
 		ss := sessMap[r.sessionID]
@@ -198,13 +193,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 			sessMap[r.sessionID] = ss
 		}
 		ss.turns++
-		if r.cost != nil {
-			if ss.cost == nil {
-				v := 0.0
-				ss.cost = &v
-			}
-			*ss.cost += *r.cost
-		}
+		addCost(&ss.cost, r.cost)
 
 		// by-project accumulation
 		ps := projMap[r.project]
@@ -216,13 +205,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		ps.turns = append(ps.turns, aggregator.Turn{PromptAt: r.promptAt, ResponseAt: r.responseAt})
 		ps.inputTokens += r.inputTok
 		ps.outputTokens += r.outputTok
-		if r.cost != nil {
-			if ps.cost == nil {
-				v := 0.0
-				ps.cost = &v
-			}
-			*ps.cost += *r.cost
-		}
+		addCost(&ps.cost, r.cost)
 
 		// daily accumulation
 		date := r.promptAt.UTC().Format("2006-01-02")
@@ -233,18 +216,12 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		}
 		ds.InputTokens += r.inputTok
 		ds.OutputTokens += r.outputTok
-	}
 
-	// count sessions per day (one turn per session per day bucket)
-	sessDateSeen := map[string]struct{}{} // "date:sessID"
-	for _, r := range allRows {
-		date := r.promptAt.UTC().Format("2006-01-02")
+		// count sessions per day (one turn per session per day bucket)
 		key := date + ":" + r.sessionID
 		if _, ok := sessDateSeen[key]; !ok {
 			sessDateSeen[key] = struct{}{}
-			if ds, ok := dailyMap[date]; ok {
-				ds.Sessions++
-			}
+			ds.Sessions++
 		}
 	}
 
@@ -354,7 +331,8 @@ func groupByWorkItem(rows []rowData, sessUserIntervals map[string][]aggregator.I
 	sessGroup := map[string]*groupState{} // sessionID → group pointer
 
 	for _, r := range rows {
-		if _, seen := sessGroup[r.sessionID]; !seen {
+		g, seen := sessGroup[r.sessionID]
+		if !seen {
 			label := r.workItem
 			if label == "" {
 				label = r.branch
@@ -363,7 +341,7 @@ func groupByWorkItem(rows []rowData, sessUserIntervals map[string][]aggregator.I
 				label = "untagged"
 			}
 			key := groupKey{r.project, label}
-			g := groups[key]
+			g = groups[key]
 			if g == nil {
 				g = &groupState{project: r.project, label: label, sessions: map[string]struct{}{}}
 				groups[key] = g
@@ -371,15 +349,8 @@ func groupByWorkItem(rows []rowData, sessUserIntervals map[string][]aggregator.I
 			sessGroup[r.sessionID] = g
 			g.sessions[r.sessionID] = struct{}{}
 		}
-		g := sessGroup[r.sessionID]
 		g.turns = append(g.turns, aggregator.Turn{PromptAt: r.promptAt, ResponseAt: r.responseAt})
-		if r.cost != nil {
-			if g.cost == nil {
-				v := 0.0
-				g.cost = &v
-			}
-			*g.cost += *r.cost
-		}
+		addCost(&g.cost, r.cost)
 	}
 
 	var result []GroupResult
@@ -546,20 +517,17 @@ func formatTime(sec int64) string {
 }
 
 func FormatJSON(r Result) string {
-	m := map[string]interface{}{
-		"sessions_count":        r.SessionsCount,
-		"agent_time_sec":        r.AgentTimeSec,
-		"user_active_time_sec":  r.UserActiveTimeSec,
-		"input_tokens":          r.InputTokens,
-		"output_tokens":         r.OutputTokens,
-		"cache_read_tokens":     r.CacheReadTokens,
-		"cache_creation_tokens": r.CacheCreationTokens,
-		"estimated_cost_usd":    r.EstimatedCostUSD,
-		"by_project":            r.ByProject,
-		"daily":                 r.Daily,
-		"sessions":              r.Sessions,
-		"groups":                r.Groups,
-	}
-	b, _ := json.Marshal(m)
+	b, _ := json.Marshal(r)
 	return string(b)
+}
+
+func addCost(dst **float64, val *float64) {
+	if val == nil {
+		return
+	}
+	if *dst == nil {
+		v := 0.0
+		*dst = &v
+	}
+	**dst += *val
 }
