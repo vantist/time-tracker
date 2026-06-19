@@ -150,3 +150,19 @@
 
 ---
 
+## 2026-06-19 — agent-attribution-report-serve [spex-apply]
+
+**Promote candidates:**
+- [ ] Early normalization in data loading layer
+  > **Why**: Storing raw data in intermediary variables and normalizing them at multiple endpoints is error-prone. Normalizing as soon as database fields are scanned ensures consistency across CLI text formatting, JSON APIs, and HTML web dashboard rendering.
+  > **How to apply**: When implementing report aggregations of columns that require normalization, run normalization function inside the `rows.Next()` scanning loop.
+
+- [ ] Avoid JS template literals backticks inside Go raw string literals
+  > **Why**: Go's raw string literal delimiter is also the backtick (`). If JavaScript code inside `const HTML = `...`` uses backticks, it terminates the Go string early, breaking compilation.
+  > **How to apply**: Always use ES5-style string concatenation (e.g., `'h ' + h`) or convert Go's multi-line string to double-quoted escaped strings if JS template literals are required.
+
+**Plan deviations:** none
+
+---
+
+
