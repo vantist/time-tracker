@@ -157,6 +157,74 @@ func TestRecordPromptTranscriptMissing(t *testing.T) {
 	}
 }
 
+// TestCountLines_LargeFile: countLines handles >1MB file correctly without reading all into memory.
+func TestCountLines_LargeFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "big.jsonl")
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	// Write 2MB worth of JSON lines (each ~100 bytes), counting lines.
+	line := `{"type":"assistant","message":{"usage":{"input_tokens":100}}}` + "\n"
+	wantLines := 0
+	written := 0
+	for written < 2*1024*1024 {
+		f.WriteString(line)
+		written += len(line)
+		wantLines++
+	}
+	f.Close()
+
+	// countLines is unexported — test via RecordPrompt with this transcript.
+	conn := openTestDB(t)
+	err = recorder.RecordPrompt(conn, recorder.PromptInput{
+		SessionID:      "sess-big",
+		Project:        "/proj",
+		Tool:           "claude-code",
+		TranscriptPath: path,
+	})
+	if err != nil {
+		t.Fatalf("RecordPrompt: %v", err)
+	}
+	var offset int
+	conn.QueryRow("SELECT prompt_line_offset FROM turns WHERE session_id='sess-big'").Scan(&offset)
+	if offset != wantLines {
+		t.Errorf("prompt_line_offset = %d, want %d", offset, wantLines)
+	}
+}
+
+// TestCountLines_LongLine: single line > 64KB is handled without panic.
+func TestCountLines_LongLine(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "longline.jsonl")
+	// Write a single line of 200KB
+	line := make([]byte, 200*1024)
+	for i := range line {
+		line[i] = 'x'
+	}
+	line[len(line)-1] = '\n'
+	if err := os.WriteFile(path, line, 0o600); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	conn := openTestDB(t)
+	err := recorder.RecordPrompt(conn, recorder.PromptInput{
+		SessionID:      "sess-long",
+		Project:        "/proj",
+		Tool:           "claude-code",
+		TranscriptPath: path,
+	})
+	if err != nil {
+		t.Fatalf("RecordPrompt should not error on long line: %v", err)
+	}
+	var offset int
+	conn.QueryRow("SELECT prompt_line_offset FROM turns WHERE session_id='sess-long'").Scan(&offset)
+	if offset != 1 {
+		t.Errorf("prompt_line_offset = %d, want 1 (one long line)", offset)
+	}
+}
+
 // Task 3.3: second RecordPrompt for same session does not recreate session
 func TestRecordPromptSecondCallSameSession(t *testing.T) {
 	conn := openTestDB(t)
