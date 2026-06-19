@@ -31,6 +31,7 @@ th { text-align: left; padding: 8px 12px; color: #64748b; border-bottom: 1px sol
 td { padding: 8px 12px; border-bottom: 1px solid #1a2030; }
 tr:hover td { background: #1a2234; }
 .status { font-size: .75rem; color: #64748b; margin-top: 8px; }
+.ratio-bar-item { height: 100%; display: flex; align-items: center; justify-content: center; font-size: .7rem; color: #fff; font-weight: 500; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; transition: width .3s; padding: 0 4px; }
 </style>
 </head>
 <body>
@@ -50,6 +51,15 @@ tr:hover td { background: #1a2234; }
 <div class="section">
   <h2>Daily (7 days)</h2>
   <div class="chart" id="chart"></div>
+</div>
+
+<div class="section" id="section-model-usages">
+  <h2>By Model & Role</h2>
+  <div id="ratio-bar" style="height: 24px; display: flex; border-radius: 4px; overflow: hidden; margin-bottom: 16px; background: #1a2030;"></div>
+  <table>
+    <thead><tr><th>Model</th><th>Role</th><th>Input Tokens</th><th>Output Tokens</th><th>Cost</th></tr></thead>
+    <tbody id="tbl-model-usages"></tbody>
+  </table>
 </div>
 
 <div class="section">
@@ -119,6 +129,41 @@ function render(d) {
     wrap.appendChild(bar); wrap.appendChild(lbl);
     chart.appendChild(wrap);
   });
+
+  const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+  const usages = d.model_usages || [];
+  const totalCost = usages.reduce((acc, x) => acc + (x.estimated_cost_usd || 0), 0);
+  const totalTokens = usages.reduce((acc, x) => acc + (x.input_tokens + x.output_tokens), 0);
+  const mBar = document.getElementById('ratio-bar');
+  mBar.innerHTML = '';
+  const mBody = document.getElementById('tbl-model-usages');
+  mBody.innerHTML = '';
+  if (usages.length === 0) {
+    document.getElementById('section-model-usages').style.display = 'none';
+  } else {
+    document.getElementById('section-model-usages').style.display = '';
+    usages.forEach((mu, idx) => {
+      let pct = 0;
+      if (totalCost > 0) {
+        pct = Math.round(((mu.estimated_cost_usd || 0) / totalCost) * 100);
+      } else if (totalTokens > 0) {
+        pct = Math.round(((mu.input_tokens + mu.output_tokens) / totalTokens) * 100);
+      }
+      if (pct > 0) {
+        const item = document.createElement('div');
+        item.className = 'ratio-bar-item';
+        item.style.width = pct + '%';
+        item.style.backgroundColor = colors[idx % colors.length];
+        item.textContent = mu.model + ' (' + pct + '%)';
+        item.title = mu.model + ' (' + (mu.is_subagent ? 'Subagent' : 'Main') + '): ' + pct + '%';
+        mBar.appendChild(item);
+      }
+      const tr = document.createElement('tr');
+      const role = mu.is_subagent ? 'Subagent' : 'Main';
+      tr.innerHTML = '<td><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:' + colors[idx % colors.length] + '; margin-right:8px;"></span>' + esc(mu.model) + '</td><td>' + role + '</td><td>' + fmt(mu.input_tokens) + '</td><td>' + fmt(mu.output_tokens) + '</td><td>' + fmtCost(mu.estimated_cost_usd) + '</td>';
+      mBody.appendChild(tr);
+    });
+  }
 
   const projBody = document.getElementById('tbl-project');
   projBody.innerHTML = '';

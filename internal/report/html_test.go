@@ -33,6 +33,10 @@ func TestHandleDashboard(t *testing.T) {
 		"id=\"tbl-agent\"",
 		"esc(s.tool)",
 		"<th>Agent</th>",
+		"<h2>By Model & Role</h2>",
+		"id=\"tbl-model-usages\"",
+		"ratio-bar-item",
+		"model_usages",
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("dashboard HTML missing element: %q", want)
@@ -61,7 +65,7 @@ func TestHandleAPIReport(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&m); err != nil {
 		t.Fatalf("body not valid JSON: %v", err)
 	}
-	for _, key := range []string{"by_project", "by_agent", "daily"} {
+	for _, key := range []string{"by_project", "by_agent", "daily", "model_usages"} {
 		if _, ok := m[key]; !ok {
 			t.Errorf("JSON missing key %q", key)
 		}
