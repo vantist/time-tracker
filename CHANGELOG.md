@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.6.0](https://github.com/vantist/time-tracker/compare/v1.5.0...v1.6.0) (2026-06-19)
+
+
+### Features
+
+* **report:** add project-specific input/output tokens and ByWorkItem field ([07d5c5a](https://github.com/vantist/time-tracker/commit/07d5c5a4f96e91f94ee964c2065905003634acf6))
+* **report:** align FormatText to print structured ASCII tables ([05005ff](https://github.com/vantist/time-tracker/commit/05005ff157e031fd9f1b5028dded1ef6506f4b3b))
+* **report:** simplify CLI report printing and format project dashboard tokens ([bccb713](https://github.com/vantist/time-tracker/commit/bccb713792992f7fcd2b1ce7729074e339c6149e))
+
 ## [1.5.0](https://github.com/vantist/time-tracker/compare/v1.4.0...v1.5.0) (2026-06-19)
 
 
