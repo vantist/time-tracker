@@ -55,16 +55,17 @@ func HasActiveSession(conn *sql.DB) bool {
 }
 
 type danglingTurn struct {
-	id               int64
-	sessionID        string
-	transcriptPath   string
-	promptLineOffset int
-	promptAt         time.Time
-	responseAt       *time.Time // non-nil when Stop hook already set it
-	processPID       int64
-	processStart     int64
-	nextOffset       *int
-	nextPromptAt     *time.Time
+	id                    int64
+	sessionID             string
+	transcriptPath        string
+	promptLineOffset      int
+	promptAt              time.Time
+	responseAt            *time.Time // non-nil when Stop hook already set it
+	processPID            int64
+	processStart          int64
+	nextOffset            *int
+	nextTranscriptPath    string
+	nextPromptAt          *time.Time
 }
 
 func reconcile(conn *sql.DB) {
@@ -76,6 +77,9 @@ func reconcile(conn *sql.DB) {
 			(SELECT prompt_line_offset FROM turns t2
 			 WHERE t2.session_id = t.session_id AND t2.id > t.id
 			 ORDER BY t2.id LIMIT 1) AS next_offset,
+			(SELECT transcript_path FROM turns t2
+			 WHERE t2.session_id = t.session_id AND t2.id > t.id
+			 ORDER BY t2.id LIMIT 1) AS next_transcript_path,
 			(SELECT prompt_at FROM turns t2
 			 WHERE t2.session_id = t.session_id AND t2.id > t.id
 			 ORDER BY t2.id LIMIT 1) AS next_prompt_at
@@ -93,6 +97,7 @@ func reconcile(conn *sql.DB) {
 	for rows.Next() {
 		var dt danglingTurn
 		var nextOffset sql.NullInt64
+		var nextTranscriptPath sql.NullString
 		var nextPromptAtStr sql.NullString
 		var promptAtStr string
 		var responseAtStr sql.NullString
@@ -100,7 +105,7 @@ func reconcile(conn *sql.DB) {
 			&dt.id, &dt.sessionID, &dt.transcriptPath, &dt.promptLineOffset, &promptAtStr,
 			&responseAtStr,
 			&dt.processPID, &dt.processStart,
-			&nextOffset, &nextPromptAtStr,
+			&nextOffset, &nextTranscriptPath, &nextPromptAtStr,
 		)
 		if err != nil {
 			continue
@@ -115,6 +120,9 @@ func reconcile(conn *sql.DB) {
 		if nextOffset.Valid {
 			v := int(nextOffset.Int64)
 			dt.nextOffset = &v
+		}
+		if nextTranscriptPath.Valid {
+			dt.nextTranscriptPath = nextTranscriptPath.String
 		}
 		if nextPromptAtStr.Valid {
 			t, err := time.Parse(time.RFC3339Nano, nextPromptAtStr.String)
@@ -133,7 +141,7 @@ func reconcile(conn *sql.DB) {
 		}
 
 		to := -1
-		if dt.nextOffset != nil {
+		if dt.nextOffset != nil && dt.nextTranscriptPath == dt.transcriptPath {
 			to = *dt.nextOffset
 		}
 

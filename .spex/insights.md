@@ -4,17 +4,17 @@
 
 ### Promote candidates
 
-- [ ] subagent usageFields aggregation — 모든 필드 전파 필수 (`Ephemeral5m/1h` 포함)
-  > **Why**: `extractSubagentTokens`에서 `sumSubagentWindow` 반환값의 `CacheCreation.Ephemeral5m/1h`를 acc에 더하지 않아 subagent 캐시 토큰이 완전히 소실됐다. 4개 기본 필드만 복사하고 새 필드를 빠뜨리는 패턴.
-  > **How to apply**: usageFields에 필드 추가 시 반드시 모든 aggregation 지점(sumWindow caller, extractSubagentTokens caller)에서 해당 필드도 더하는지 grep으로 확인.
+- [ ] subagent usageFields aggregation — 所有欄位必須傳遞（含 `Ephemeral5m/1h`）
+  > **Why**: `extractSubagentTokens` 中未將 `sumSubagentWindow` 回傳值的 `CacheCreation.Ephemeral5m/1h` 累加至 acc，導致 subagent 快取 token 完全遺失。只複製 4 個基本欄位、漏掉新欄位的模式。
+  > **How to apply**: 新增欄位至 usageFields 時，務必 grep 確認所有 aggregation 呼叫點（sumWindow caller、extractSubagentTokens caller）都有累加該欄位。
 
-- [ ] fallback window 범위를 변수로 추출 — `winFrom, winTo` 패턴
-  > **Why**: /clear fallback 시 `acc`는 `prevUserIdx+1..lastUserIdx` 범위로 재계산했지만 `extractSubagentTokens`는 여전히 원래 `lastUserIdx+1..len(all)` 를 사용 — 빈 창에서 subagent를 찾게 돼 tokens 유실.
-  > **How to apply**: primary/fallback 창 범위를 `winFrom, winTo` 변수로 추출한 후 `sumWindow`와 `extractSubagentTokens` 둘 다 같은 변수로 호출.
+- [ ] fallback window 範圍提取為變數 — `winFrom, winTo` 模式
+  > **Why**: `/clear` fallback 時 `acc` 已改用 `prevUserIdx+1..lastUserIdx` 範圍重算，但 `extractSubagentTokens` 仍使用原始 `lastUserIdx+1..len(all)`——導致在空窗口內尋找 subagent，token 遺失。
+  > **How to apply**: 將 primary/fallback 窗口範圍提取為 `winFrom, winTo` 變數，`sumWindow` 與 `extractSubagentTokens` 都使用同一組變數呼叫。
 
-- [ ] JSON→DB 직렬화 경계에서 새 필드 체크리스트
-  > **Why**: `marshalWindowResult`, `tokenPayload` struct, UPDATE SQL 세 곳에 각각 필드를 추가해야 하는데 하나라도 빠지면 조용히 손실. code review 에서야 발견.
-  > **How to apply**: Stop hook 경로의 토큰 흐름: `WindowResult` → `marshalWindowResult` (map) → `tokenPayload` (JSON) → `conn.Exec UPDATE SQL`. 새 필드 추가 시 4단계 모두 체크.
+- [ ] JSON→DB 序列化邊界新欄位檢查清單
+  > **Why**: `marshalWindowResult`、`tokenPayload` struct、UPDATE SQL 三處各需新增欄位，缺一則靜默遺失。直到 code review 才發現。
+  > **How to apply**: Stop hook 的 token 流：`WindowResult` → `marshalWindowResult` (map) → `tokenPayload` (JSON) → `conn.Exec UPDATE SQL`。新增欄位時四個步驟都要確認。
 
 **Plan deviations:** none
 
