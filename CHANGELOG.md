@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.5.0](https://github.com/vantist/time-tracker/compare/v1.4.0...v1.5.0) (2026-06-19)
+
+
+### Features
+
+* **aggregator:** 新增 Interval 型別及 UserIntervals、MergeAndSum 函數 ([61f869a](https://github.com/vantist/time-tracker/commit/61f869a7ec27969778f69e9e1b5f84d559e3cbb3))
+* **db:** 新增 turns 表四個欄位（model、cache_creation_5m/1h、subagent_tokens_settled） ([c721854](https://github.com/vantist/time-tracker/commit/c721854105445a0ea51eb69f04c5fb20453e1fa4))
+* ExtractLastTurn、WindowResult 整合、reconcile subagent_tokens_settled、pricing 5m/1h 費率 ([7e6880d](https://github.com/vantist/time-tracker/commit/7e6880d31bd48cd3adb8820d3af6dcab22d157d2))
+* **transcript:** WindowResult typed struct + extractSubagentTokens to 邊界 + cache 5m/1h 欄位 ([320f091](https://github.com/vantist/time-tracker/commit/320f091fd61266e8138c136e29bdac8c509ab62a))
+
+
+### Bug Fixes
+
+* **aggregator:** UserIntervals 略過非正值 interval（守衛 d &gt; 0） ([dbf1398](https://github.com/vantist/time-tracker/commit/dbf1398ca61afc54fa0fa2ca2219b1c9fa1df362))
+* **reconcile:** guard nextOffset by transcript path match ([935f18b](https://github.com/vantist/time-tracker/commit/935f18b3bdf4584987bfb6eadb05ac2bc4b1dc39))
+* **recorder:** countLines 改用 bufio.Scanner（1MB buffer）避免大 transcript 全量讀入記憶體 ([17ed65c](https://github.com/vantist/time-tracker/commit/17ed65c801d6ab62c80c8abfc1aca9734e2d0a3a))
+* **report:** 改用 interval-based user time 聚合，支援多 session merge 去重 ([6b2aca6](https://github.com/vantist/time-tracker/commit/6b2aca666b36becac0ee94e3272a6ff80897e10c))
+* **report:** 移除 groupByWorkItem 未使用的 idleThreshold 參數 ([e3797d6](https://github.com/vantist/time-tracker/commit/e3797d6b319c43729802463f5515e04e24030e80))
+* **token-tracking:** 修正 code review 發現的 5 個 bug ([99d33b7](https://github.com/vantist/time-tracker/commit/99d33b77df852abc636979ecc23cc9a70a305fe3))
+
 ## [1.4.0](https://github.com/vantist/time-tracker/compare/v1.3.2...v1.4.0) (2026-06-18)
 
 
