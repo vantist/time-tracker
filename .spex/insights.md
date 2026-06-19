@@ -165,4 +165,16 @@
 
 ---
 
+## 2026-06-20 — subagent-model-tracking [spex-apply]
 
+**Promote candidates:**
+- [ ] Consolidated model usage mapping helper `makeMainUsage`
+  > **Why**: Reusable mapping of transcript aggregator fields to `ModelUsage` encapsulates mapping logic, preventing duplicate struct assignments across multiple extraction entry points (e.g. `ExtractWindow` and `ExtractLastTurn`).
+  > **How to apply**: When extracting fields from raw source maps into reporting structs, utilize mapper/builder functions to keep instantiation DRY.
+- [ ] Atomic SQLite turn usage detail transactions
+  > **Why**: Deleting old turn detail usages and inserting new detail values must happen atomically alongside updating the parent `turns` record. Failing to do so in a single transaction can lead to mismatched states on partial failure.
+  > **How to apply**: Always wrap turn reconciliations and event recordings in explicit SQLite transaction blocks (`tx.Begin()` / `tx.Commit()`) with deferred `Rollback()` calls.
+
+**Plan deviations:** none
+
+---
