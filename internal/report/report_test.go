@@ -173,9 +173,9 @@ func TestQueryByProject(t *testing.T) {
 	insertSession(t, conn, "s1", "/alpha", "main", "")
 	insertSession(t, conn, "s2", "/alpha", "main", "")
 	insertSession(t, conn, "s3", "/beta", "main", "")
-	insertTurnFull(t, conn, "s1", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 0, 0, 0, 0, ptr(0.01))
-	insertTurnFull(t, conn, "s2", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 0, 0, 0, 0, ptr(0.02))
-	insertTurnFull(t, conn, "s3", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 0, 0, 0, 0, ptr(0.03))
+	insertTurnFull(t, conn, "s1", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 100, 50, 0, 0, ptr(0.01))
+	insertTurnFull(t, conn, "s2", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 200, 80, 0, 0, ptr(0.02))
+	insertTurnFull(t, conn, "s3", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), 300, 150, 0, 0, ptr(0.03))
 
 	result, err := report.Query(conn, report.Options{Since: now.Add(-24 * time.Hour)})
 	if err != nil {
@@ -190,6 +190,19 @@ func TestQueryByProject(t *testing.T) {
 	}
 	if result.ByProject[0].SessionsCount != 2 {
 		t.Errorf("ByProject[0].SessionsCount = %d, want 2", result.ByProject[0].SessionsCount)
+	}
+	// Verify that project-specific token fields are aggregated properly
+	if result.ByProject[0].InputTokens != 300 {
+		t.Errorf("ByProject[0].InputTokens = %d, want 300", result.ByProject[0].InputTokens)
+	}
+	if result.ByProject[0].OutputTokens != 130 {
+		t.Errorf("ByProject[0].OutputTokens = %d, want 130", result.ByProject[0].OutputTokens)
+	}
+	if result.ByProject[1].InputTokens != 300 {
+		t.Errorf("ByProject[1].InputTokens = %d, want 300", result.ByProject[1].InputTokens)
+	}
+	if result.ByProject[1].OutputTokens != 150 {
+		t.Errorf("ByProject[1].OutputTokens = %d, want 150", result.ByProject[1].OutputTokens)
 	}
 }
 
@@ -688,5 +701,113 @@ func TestGroupByWorkItem_SameWorkItemDifferentProject(t *testing.T) {
 	}
 	if !projects["alpha"] || !projects["beta"] {
 		t.Errorf("expected both alpha and beta in Projects, got: %v", projects)
+	}
+}
+
+func TestFormatTextFull(t *testing.T) {
+	costVal := 0.05
+	costVal2 := 0.0
+	r := report.Result{
+		SessionsCount:     3,
+		AgentTimeSec:      int64(2*3600 + 34*60),
+		UserActiveTimeSec: int64(1*3600 + 10*60),
+		InputTokens:       10000,
+		OutputTokens:      2000,
+		EstimatedCostUSD:  ptr(0.042),
+		Daily: []report.DailyStat{
+			{Date: "2026-06-15", Sessions: 1, InputTokens: 4000, OutputTokens: 800},
+			{Date: "2026-06-16", Sessions: 2, InputTokens: 6000, OutputTokens: 1200},
+		},
+		ByProject: []report.ProjectSummary{
+			{Project: "alpha", SessionsCount: 2, AgentTimeSec: 3600, UserActiveTimeSec: 1800, CostUSD: &costVal, InputTokens: 5000, OutputTokens: 1000},
+			{Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, CostUSD: nil, InputTokens: 5000, OutputTokens: 1000},
+		},
+		Groups: []report.GroupResult{
+			{Label: "feat-a", Project: "alpha", SessionsCount: 1, AgentTimeSec: 2000, UserActiveTimeSec: 1000, EstimatedCostUSD: &costVal},
+			{Label: "feat-b", Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, EstimatedCostUSD: nil},
+		},
+		Sessions: []report.SessionRow{
+			{
+				ID:           "s1",
+				Project:      "/path/to/alpha",
+				Branch:       "main",
+				Model:        "gemini-2.5-flash",
+				StartedAt:    "2026-06-19T10:00:00Z",
+				WorkItem:     "feat-a",
+				Turns:        5,
+				AgentTimeSec: 1200,
+				UserTimeSec:  600,
+				CostUSD:      &costVal,
+			},
+			{
+				ID:           "s2",
+				Project:      "/path/to/beta",
+				Branch:       "dev",
+				Model:        "gemini-2.5-pro",
+				StartedAt:    "2026-06-19T09:00:00Z",
+				WorkItem:     "feat-b",
+				Turns:        2,
+				AgentTimeSec: 600,
+				UserTimeSec:  300,
+				CostUSD:      &costVal2,
+			},
+		},
+	}
+
+	text := report.FormatText(r)
+
+	// Verify Daily timeline headers and content
+	for _, want := range []string{
+		"─── Daily (Last 7 Days) ───",
+		"Date", "Sessions", "Input Tokens", "Output Tokens",
+		"2026-06-15", "4,000", "800",
+		"2026-06-16", "6,000", "1,200",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing daily detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// Verify By Project headers and content
+	for _, want := range []string{
+		"─── By Project ───",
+		"Project", "Sessions", "Agent Time", "User Active", "Tokens (I/O)", "Cost",
+		"alpha", "2", "1h 0m", "0h 30m", "5,000 / 1,000", "$0.0500",
+		"beta", "1", "0h 20m", "0h 10m", "5,000 / 1,000", "N/A",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing project detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// Verify By Work Item headers and content
+	for _, want := range []string{
+		"─── By Work Item ───",
+		"Work Item", "Project", "Sessions", "Agent Time", "User Active", "Cost",
+		"feat-a", "alpha", "1", "0h 33m", "0h 16m", "$0.0500",
+		"feat-b", "beta", "1", "0h 20m", "0h 10m", "N/A",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing work item detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// Verify Sessions log headers and content
+	for _, want := range []string{
+		"─── Sessions ───",
+		"Start Time", "Project", "Branch", "Model", "Turns", "Agent Time", "User Time", "Work Item", "Cost",
+		"alpha", "beta", "main", "dev", "gemini-2.5-flash", "gemini-2.5-pro",
+		"5", "2", "0h 20m", "0h 10m", "0h 5m", "feat-a", "feat-b", "$0.0500", "$0.0000",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText missing session detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// Verify timezone formatting local time check
+	t1, _ := time.Parse(time.RFC3339, "2026-06-19T10:00:00Z")
+	t1Local := t1.Local().Format("2006-01-02 15:04:05")
+	if !strings.Contains(text, t1Local) {
+		t.Errorf("FormatText missing session start time local formatted string %q, got:\n%s", t1Local, text)
 	}
 }

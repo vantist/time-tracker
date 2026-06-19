@@ -47,6 +47,7 @@ type Result struct {
 	ByProject            []ProjectSummary // grouped by session.project
 	Daily                []DailyStat      // last 7 days
 	Sessions             []SessionRow     // all sessions in range, newest first
+	ByWorkItem           bool
 }
 
 type ProjectSummary struct {
@@ -55,6 +56,8 @@ type ProjectSummary struct {
 	AgentTimeSec       int64    `json:"agent_time_seconds"`
 	UserActiveTimeSec  int64    `json:"user_active_time_sec"`
 	CostUSD            *float64 `json:"cost_usd"`
+	InputTokens        int64    `json:"input_tokens"`
+	OutputTokens       int64    `json:"output_tokens"`
 }
 
 type DailyStat struct {
@@ -161,9 +164,11 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	sessMap := map[string]*sessState{}
 	// project → {sessions, agent turns, cost}
 	type projState struct {
-		sessions map[string]struct{}
-		turns    []aggregator.Turn
-		cost     *float64
+		sessions     map[string]struct{}
+		turns        []aggregator.Turn
+		cost         *float64
+		inputTokens  int64
+		outputTokens int64
 	}
 	projMap := map[string]*projState{}
 	// date → DailyStat
@@ -209,6 +214,8 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		}
 		ps.sessions[r.sessionID] = struct{}{}
 		ps.turns = append(ps.turns, aggregator.Turn{PromptAt: r.promptAt, ResponseAt: r.responseAt})
+		ps.inputTokens += r.inputTok
+		ps.outputTokens += r.outputTok
 		if r.cost != nil {
 			if ps.cost == nil {
 				v := 0.0
@@ -262,6 +269,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	res.UserActiveTimeSec = int64(aggregator.MergeAndSum(allIntervals).Seconds())
 
 	res.Groups = groupByWorkItem(allRows, sessUserIntervals)
+	res.ByWorkItem = opts.ByWorkItem
 
 	// build ByProject sorted by sessions desc
 	for proj, ps := range projMap {
@@ -277,6 +285,8 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 			AgentTimeSec:      agentSec,
 			UserActiveTimeSec: userSec,
 			CostUSD:           ps.cost,
+			InputTokens:       ps.inputTokens,
+			OutputTokens:      ps.outputTokens,
 		})
 	}
 	sort.Slice(res.ByProject, func(i, j int) bool {
