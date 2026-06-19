@@ -135,119 +135,119 @@ func reconcile(conn *sql.DB) {
 	rows.Close()
 
 	for _, dt := range turns {
-		isLatest := dt.nextOffset == nil
-		if isLatest && process.IsAlive(dt.processPID, dt.processStart) {
-			continue
-		}
-
-		to := -1
-		if dt.nextOffset != nil && dt.nextTranscriptPath == dt.transcriptPath {
-			to = *dt.nextOffset
-		}
-
-		result, err := transcript.ExtractWindow(dt.transcriptPath, dt.promptLineOffset, to)
-		if err != nil || (result.InputTokens() == 0 && result.OutputTokens() == 0) {
-			continue
-		}
-
-		tx, err := conn.Begin()
-		if err != nil {
-			continue
-		}
-
-		// Delete old turn model usages
-		_, err = tx.Exec("DELETE FROM turn_model_usages WHERE turn_id=?", dt.id)
-		if err != nil {
-			tx.Rollback()
-			continue
-		}
-
-		// Insert new usages
-		var totalCostVal float64
-		var hasAnyCost bool
-
-		for _, u := range result.Usages {
-			costPtr := pricing.CalculateForUsage(u)
-			var costVal float64
-			if costPtr != nil {
-				costVal = *costPtr
-				totalCostVal += costVal
-				hasAnyCost = true
-			}
-
-			_, err = tx.Exec(`
-				INSERT INTO turn_model_usages (
-					turn_id, model, is_subagent,
-					input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
-					cache_creation_5m_tokens, cache_creation_1h_tokens, estimated_cost_usd
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-				dt.id,
-				u.Model,
-				u.IsSubagent,
-				u.InputTokens,
-				u.OutputTokens,
-				u.CacheReadTokens,
-				u.CacheCreationTokens,
-				u.CacheCreation5m,
-				u.CacheCreation1h,
-				costVal,
-			)
-			if err != nil {
-				tx.Rollback()
-				break
-			}
-		}
-		if err != nil {
-			continue
-		}
-
-		var totalCost *float64
-		if hasAnyCost {
-			totalCost = &totalCostVal
-		}
-
-		if dt.responseAt != nil {
-			// Stop hook already wrote response_at — overwrite tokens (subagent may be incomplete).
-			_, err = tx.Exec(
-				`UPDATE turns SET input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
-				 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
-				 estimated_cost_usd=?, subagent_tokens_settled=1
-				 WHERE id=?`,
-				result.InputTokens(), result.OutputTokens(), result.CacheReadTokens(), result.CacheCreationTokens(),
-				result.CacheCreate5m(), result.CacheCreate1h(), result.Model(),
-				totalCost,
-				dt.id,
-			)
-		} else {
-			var responseAt time.Time
-			if dt.nextPromptAt != nil {
-				responseAt = dt.nextPromptAt.Add(-time.Millisecond)
-			} else {
-				info, err := os.Stat(dt.transcriptPath)
-				if err != nil {
-					tx.Rollback()
-					continue
-				}
-				responseAt = info.ModTime()
-			}
-			_, err = tx.Exec(
-				`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
-				 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
-				 estimated_cost_usd=?, subagent_tokens_settled=1
-				 WHERE id=? AND response_at IS NULL`,
-				responseAt.UTC().Format(time.RFC3339Nano),
-				result.InputTokens(), result.OutputTokens(), result.CacheReadTokens(), result.CacheCreationTokens(),
-				result.CacheCreate5m(), result.CacheCreate1h(), result.Model(),
-				totalCost,
-				dt.id,
-			)
-		}
-
-		if err != nil {
-			tx.Rollback()
-			continue
-		}
-
-		tx.Commit()
+		_ = reconcileTurn(conn, dt)
 	}
+}
+
+func reconcileTurn(conn *sql.DB, dt danglingTurn) error {
+	isLatest := dt.nextOffset == nil
+	if isLatest && process.IsAlive(dt.processPID, dt.processStart) {
+		return nil
+	}
+
+	to := -1
+	if dt.nextOffset != nil && dt.nextTranscriptPath == dt.transcriptPath {
+		to = *dt.nextOffset
+	}
+
+	result, err := transcript.ExtractWindow(dt.transcriptPath, dt.promptLineOffset, to)
+	if err != nil {
+		return err
+	}
+	if result.InputTokens() == 0 && result.OutputTokens() == 0 {
+		return nil
+	}
+
+	tx, err := conn.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// Delete old turn model usages
+	if _, err = tx.Exec("DELETE FROM turn_model_usages WHERE turn_id=?", dt.id); err != nil {
+		return err
+	}
+
+	// Insert new usages
+	var totalCostVal float64
+	var hasAnyCost bool
+
+	for _, u := range result.Usages {
+		costPtr := pricing.CalculateForUsage(u)
+		var costVal float64
+		if costPtr != nil {
+			costVal = *costPtr
+			totalCostVal += costVal
+			hasAnyCost = true
+		}
+
+		_, err = tx.Exec(`
+			INSERT INTO turn_model_usages (
+				turn_id, model, is_subagent,
+				input_tokens, output_tokens, cache_read_tokens, cache_creation_tokens,
+				cache_creation_5m_tokens, cache_creation_1h_tokens, estimated_cost_usd
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			dt.id,
+			u.Model,
+			u.IsSubagent,
+			u.InputTokens,
+			u.OutputTokens,
+			u.CacheReadTokens,
+			u.CacheCreationTokens,
+			u.CacheCreation5m,
+			u.CacheCreation1h,
+			costVal,
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	var totalCost *float64
+	if hasAnyCost {
+		totalCost = &totalCostVal
+	}
+
+	if dt.responseAt != nil {
+		// Stop hook already wrote response_at — overwrite tokens (subagent may be incomplete).
+		_, err = tx.Exec(
+			`UPDATE turns SET input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
+			 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
+			 estimated_cost_usd=?, subagent_tokens_settled=1
+			 WHERE id=?`,
+			result.InputTokens(), result.OutputTokens(), result.CacheReadTokens(), result.CacheCreationTokens(),
+			result.CacheCreate5m(), result.CacheCreate1h(), result.Model(),
+			totalCost,
+			dt.id,
+		)
+	} else {
+		var responseAt time.Time
+		if dt.nextPromptAt != nil {
+			responseAt = dt.nextPromptAt.Add(-time.Millisecond)
+		} else {
+			info, err := os.Stat(dt.transcriptPath)
+			if err != nil {
+				return err
+			}
+			responseAt = info.ModTime()
+		}
+		_, err = tx.Exec(
+			`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
+			 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
+			 estimated_cost_usd=?, subagent_tokens_settled=1
+			 WHERE id=? AND response_at IS NULL`,
+			responseAt.UTC().Format(time.RFC3339Nano),
+			result.InputTokens(), result.OutputTokens(), result.CacheReadTokens(), result.CacheCreationTokens(),
+			result.CacheCreate5m(), result.CacheCreate1h(), result.Model(),
+			totalCost,
+			dt.id,
+		)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return tx.Commit()
 }

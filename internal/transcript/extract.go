@@ -124,17 +124,7 @@ func ExtractWindow(path string, from, to int) (WindowResult, error) {
 		return WindowResult{}, err
 	}
 
-	var mainModel string
-	for i := len(all) - 1; i >= 0; i-- {
-		e := all[i]
-		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
-			mainModel = e.Message.Model
-			break
-		}
-	}
-	if mainModel == "" {
-		mainModel = "unknown"
-	}
+	mainModel := findMainModel(all)
 
 	end := len(all)
 	if to != -1 && to < end {
@@ -148,16 +138,7 @@ func ExtractWindow(path string, from, to int) (WindowResult, error) {
 
 	var result WindowResult
 	if acc.InputTokens > 0 || acc.OutputTokens > 0 || mainModel != "unknown" {
-		result.Usages = append(result.Usages, ModelUsage{
-			Model:               mainModel,
-			IsSubagent:          false,
-			InputTokens:         acc.InputTokens,
-			OutputTokens:        acc.OutputTokens,
-			CacheReadTokens:     acc.CacheReadInputTokens,
-			CacheCreationTokens: acc.CacheCreationInputTokens,
-			CacheCreation5m:     acc.CacheCreation.Ephemeral5m,
-			CacheCreation1h:     acc.CacheCreation.Ephemeral1h,
-		})
+		result.Usages = append(result.Usages, makeMainUsage(mainModel, acc))
 	}
 
 	subUsages := extractSubagentModelUsages(path, all, from, end)
@@ -178,17 +159,7 @@ func ExtractLastTurn(path string) (WindowResult, error) {
 		return WindowResult{}, nil
 	}
 
-	var mainModel string
-	for i := len(all) - 1; i >= 0; i-- {
-		e := all[i]
-		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
-			mainModel = e.Message.Model
-			break
-		}
-	}
-	if mainModel == "" {
-		mainModel = "unknown"
-	}
+	mainModel := findMainModel(all)
 
 	lastUserIdx := -1
 	for i := len(all) - 1; i >= 0; i-- {
@@ -216,22 +187,36 @@ func ExtractLastTurn(path string) (WindowResult, error) {
 
 	var result WindowResult
 	if acc.InputTokens > 0 || acc.OutputTokens > 0 || mainModel != "unknown" {
-		result.Usages = append(result.Usages, ModelUsage{
-			Model:               mainModel,
-			IsSubagent:          false,
-			InputTokens:         acc.InputTokens,
-			OutputTokens:        acc.OutputTokens,
-			CacheReadTokens:     acc.CacheReadInputTokens,
-			CacheCreationTokens: acc.CacheCreationInputTokens,
-			CacheCreation5m:     acc.CacheCreation.Ephemeral5m,
-			CacheCreation1h:     acc.CacheCreation.Ephemeral1h,
-		})
+		result.Usages = append(result.Usages, makeMainUsage(mainModel, acc))
 	}
 
 	subUsages := extractSubagentModelUsages(path, all, winFrom, winTo)
 	result.Usages = append(result.Usages, subUsages...)
 
 	return result, nil
+}
+
+func findMainModel(all []entry) string {
+	for i := len(all) - 1; i >= 0; i-- {
+		e := all[i]
+		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
+			return e.Message.Model
+		}
+	}
+	return "unknown"
+}
+
+func makeMainUsage(model string, acc usageFields) ModelUsage {
+	return ModelUsage{
+		Model:               model,
+		IsSubagent:          false,
+		InputTokens:         acc.InputTokens,
+		OutputTokens:        acc.OutputTokens,
+		CacheReadTokens:     acc.CacheReadInputTokens,
+		CacheCreationTokens: acc.CacheCreationInputTokens,
+		CacheCreation5m:     acc.CacheCreation.Ephemeral5m,
+		CacheCreation1h:     acc.CacheCreation.Ephemeral1h,
+	}
 }
 
 func loadTranscript(path string) ([]entry, error) {
