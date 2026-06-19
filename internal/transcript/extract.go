@@ -7,11 +7,29 @@ import (
 	"strings"
 )
 
+
+// WindowResult holds extracted token usage and model for a transcript window.
+type WindowResult struct {
+	InputTokens         int
+	OutputTokens        int
+	CacheReadTokens     int
+	CacheCreationTokens int // total cache creation (5m + 1h)
+	CacheCreate5m       int // ephemeral_5m_input_tokens
+	CacheCreate1h       int // ephemeral_1h_input_tokens
+	Model               string
+}
+
+type cacheCreationFields struct {
+	Ephemeral5m int `json:"ephemeral_5m_input_tokens"`
+	Ephemeral1h int `json:"ephemeral_1h_input_tokens"`
+}
+
 type usageFields struct {
-	InputTokens              int `json:"input_tokens"`
-	OutputTokens             int `json:"output_tokens"`
-	CacheReadInputTokens     int `json:"cache_read_input_tokens"`
-	CacheCreationInputTokens int `json:"cache_creation_input_tokens"`
+	InputTokens              int                `json:"input_tokens"`
+	OutputTokens             int                `json:"output_tokens"`
+	CacheReadInputTokens     int                `json:"cache_read_input_tokens"`
+	CacheCreationInputTokens int                `json:"cache_creation_input_tokens"`
+	CacheCreation            cacheCreationFields `json:"cache_creation"`
 }
 
 type contentBlock struct {
@@ -37,17 +55,19 @@ type subagentMeta struct {
 // ExtractWindow extracts token usage and model from a transcript JSONL file
 // for entries in the range [from, to). to=-1 means read to EOF.
 // Returns error if the file cannot be opened.
-func ExtractWindow(path string, from, to int) (tokensJSON string, model string, err error) {
+func ExtractWindow(path string, from, to int) (WindowResult, error) {
 	all, err := loadTranscript(path)
 	if err != nil {
-		return "", "", err
+		return WindowResult{}, err
 	}
+
+	var result WindowResult
 
 	// Model from last non-sidechain assistant entry (whole transcript).
 	for i := len(all) - 1; i >= 0; i-- {
 		e := all[i]
 		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
-			model = e.Message.Model
+			result.Model = e.Message.Model
 			break
 		}
 	}
@@ -62,26 +82,22 @@ func ExtractWindow(path string, from, to int) (tokensJSON string, model string, 
 
 	acc := sumWindow(all, from, end)
 
-	sub := extractSubagentTokens(path, all, from)
+	sub := extractSubagentTokens(path, all, from, end)
 	acc.InputTokens += sub.InputTokens
 	acc.OutputTokens += sub.OutputTokens
 	acc.CacheReadInputTokens += sub.CacheReadInputTokens
 	acc.CacheCreationInputTokens += sub.CacheCreationInputTokens
+	acc.CacheCreation.Ephemeral5m += sub.CacheCreation.Ephemeral5m
+	acc.CacheCreation.Ephemeral1h += sub.CacheCreation.Ephemeral1h
 
-	if acc.InputTokens == 0 && acc.OutputTokens == 0 {
-		return "", model, nil
-	}
+	result.InputTokens = acc.InputTokens
+	result.OutputTokens = acc.OutputTokens
+	result.CacheReadTokens = acc.CacheReadInputTokens
+	result.CacheCreationTokens = acc.CacheCreationInputTokens
+	result.CacheCreate5m = acc.CacheCreation.Ephemeral5m
+	result.CacheCreate1h = acc.CacheCreation.Ephemeral1h
 
-	out, err := json.Marshal(map[string]int{
-		"input_tokens":          acc.InputTokens,
-		"output_tokens":         acc.OutputTokens,
-		"cache_read_tokens":     acc.CacheReadInputTokens,
-		"cache_creation_tokens": acc.CacheCreationInputTokens,
-	})
-	if err != nil {
-		return "", model, nil
-	}
-	return string(out), model, nil
+	return result, nil
 }
 
 func loadTranscript(path string) ([]entry, error) {
@@ -127,13 +143,19 @@ func sumWindow(all []entry, from, to int) usageFields {
 		acc.OutputTokens += u.OutputTokens
 		acc.CacheReadInputTokens += u.CacheReadInputTokens
 		acc.CacheCreationInputTokens += u.CacheCreationInputTokens
+		acc.CacheCreation.Ephemeral5m += u.CacheCreation.Ephemeral5m
+		acc.CacheCreation.Ephemeral1h += u.CacheCreation.Ephemeral1h
 	}
 	return acc
 }
 
-func extractSubagentTokens(transcriptPath string, entries []entry, offset int) usageFields {
+// extractSubagentTokens scans entries[from:min(to,len(entries))] for Agent tool_use IDs.
+func extractSubagentTokens(transcriptPath string, entries []entry, from, to int) usageFields {
+	if to > len(entries) {
+		to = len(entries)
+	}
 	agentIDs := make(map[string]bool)
-	for i := offset; i < len(entries); i++ {
+	for i := from; i < to; i++ {
 		e := entries[i]
 		if e.Type != "assistant" {
 			continue
@@ -196,6 +218,8 @@ func sumSubagentWindow(entries []entry) usageFields {
 		acc.OutputTokens += u.OutputTokens
 		acc.CacheReadInputTokens += u.CacheReadInputTokens
 		acc.CacheCreationInputTokens += u.CacheCreationInputTokens
+		acc.CacheCreation.Ephemeral5m += u.CacheCreation.Ephemeral5m
+		acc.CacheCreation.Ephemeral1h += u.CacheCreation.Ephemeral1h
 	}
 	return acc
 }
