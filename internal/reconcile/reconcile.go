@@ -2,7 +2,6 @@ package reconcile
 
 import (
 	"database/sql"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"sync"
@@ -82,7 +81,7 @@ func reconcile(conn *sql.DB) {
 			 ORDER BY t2.id LIMIT 1) AS next_prompt_at
 		FROM turns t
 		JOIN sessions s ON s.id = t.session_id
-		WHERE (t.response_at IS NULL OR t.input_tokens IS NULL)
+		WHERE (t.response_at IS NULL OR t.input_tokens IS NULL OR t.subagent_tokens_settled = 0)
 		  AND t.transcript_path IS NOT NULL
 		  AND t.prompt_line_offset IS NOT NULL
 	`)
@@ -138,23 +137,25 @@ func reconcile(conn *sql.DB) {
 			to = *dt.nextOffset
 		}
 
-		tokensJSON, model, err := transcript.ExtractWindow(dt.transcriptPath, dt.promptLineOffset, to)
-		if err != nil || tokensJSON == "" {
+		result, err := transcript.ExtractWindow(dt.transcriptPath, dt.promptLineOffset, to)
+		if err != nil || (result.InputTokens == 0 && result.OutputTokens == 0) {
 			continue
 		}
 
-		tokens := parseTokensJSON(tokensJSON)
 		var cost *float64
-		if model != "" {
-			cost = pricing.Calculate(model, tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate)
+		if result.Model != "" {
+			cost = pricing.Calculate(result.Model, result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.CacheCreationTokens, result.CacheCreate5m, result.CacheCreate1h)
 		}
 
 		if dt.responseAt != nil {
-			// Stop hook already wrote response_at — only backfill missing tokens.
+			// Stop hook already wrote response_at — overwrite tokens (subagent may be incomplete).
 			conn.Exec(
-				`UPDATE turns SET input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=?
-				 WHERE id=? AND input_tokens IS NULL`,
-				tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate,
+				`UPDATE turns SET input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
+				 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
+				 estimated_cost_usd=?, subagent_tokens_settled=1
+				 WHERE id=?`,
+				result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.CacheCreationTokens,
+				result.CacheCreate5m, result.CacheCreate1h, result.Model,
 				cost,
 				dt.id,
 			)
@@ -170,30 +171,16 @@ func reconcile(conn *sql.DB) {
 				responseAt = info.ModTime()
 			}
 			conn.Exec(
-				`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?, estimated_cost_usd=?
+				`UPDATE turns SET response_at=?, input_tokens=?, output_tokens=?, cache_read_tokens=?, cache_creation_tokens=?,
+				 cache_creation_5m_tokens=?, cache_creation_1h_tokens=?, model=?,
+				 estimated_cost_usd=?, subagent_tokens_settled=1
 				 WHERE id=? AND response_at IS NULL`,
 				responseAt.UTC().Format(time.RFC3339Nano),
-				tokens.input, tokens.output, tokens.cacheRead, tokens.cacheCreate,
+				result.InputTokens, result.OutputTokens, result.CacheReadTokens, result.CacheCreationTokens,
+				result.CacheCreate5m, result.CacheCreate1h, result.Model,
 				cost,
 				dt.id,
 			)
 		}
-	}
-}
-
-type tokenCounts struct {
-	input, output, cacheRead, cacheCreate int
-}
-
-func parseTokensJSON(tokensJSON string) tokenCounts {
-	var m map[string]int
-	if err := json.Unmarshal([]byte(tokensJSON), &m); err != nil {
-		return tokenCounts{}
-	}
-	return tokenCounts{
-		input:       m["input_tokens"],
-		output:      m["output_tokens"],
-		cacheRead:   m["cache_read_tokens"],
-		cacheCreate: m["cache_creation_tokens"],
 	}
 }

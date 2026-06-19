@@ -8,6 +8,50 @@ import (
 	"github.com/user/tt/internal/transcript"
 )
 
+// TestExtractLastTurn_ClearRace: /clear race — lastUserIdx has no following assistant entries,
+// fallback to previous turn window.
+func TestExtractLastTurn_ClearRace(t *testing.T) {
+	lines := []string{
+		// prev turn
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50}}}`,
+		// /clear user entry — no assistant follows (race condition)
+		`{"type":"user","isSidechain":false}`,
+	}
+	path := writeLines(t, lines)
+
+	result, err := transcript.ExtractLastTurn(path)
+	if err != nil {
+		t.Fatalf("ExtractLastTurn: %v", err)
+	}
+	// should fall back to prev turn: input=100, output=50
+	if result.InputTokens != 100 {
+		t.Errorf("InputTokens = %d, want 100 (fallback to prev turn)", result.InputTokens)
+	}
+	if result.OutputTokens != 50 {
+		t.Errorf("OutputTokens = %d, want 50 (fallback to prev turn)", result.OutputTokens)
+	}
+}
+
+// TestExtractLastTurn_Normal: normal last turn extraction.
+func TestExtractLastTurn_Normal(t *testing.T) {
+	lines := []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-haiku-4-5","usage":{"input_tokens":10,"output_tokens":5}}}`,
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-haiku-4-5","usage":{"input_tokens":200,"output_tokens":80}}}`,
+	}
+	path := writeLines(t, lines)
+
+	result, err := transcript.ExtractLastTurn(path)
+	if err != nil {
+		t.Fatalf("ExtractLastTurn: %v", err)
+	}
+	if result.InputTokens != 200 {
+		t.Errorf("InputTokens = %d, want 200", result.InputTokens)
+	}
+}
+
 // TestExtractWindow_SubagentBoundary: subagent tokens from after [to] are NOT counted.
 func TestExtractWindow_SubagentBoundary(t *testing.T) {
 	dir := t.TempDir()

@@ -41,7 +41,11 @@ func newTestDB(t *testing.T) *sql.DB {
 			cache_creation_tokens INTEGER,
 			estimated_cost_usd REAL,
 			transcript_path TEXT,
-			prompt_line_offset INTEGER
+			prompt_line_offset INTEGER,
+			model TEXT,
+			cache_creation_5m_tokens INTEGER,
+			cache_creation_1h_tokens INTEGER,
+			subagent_tokens_settled BOOLEAN DEFAULT 0
 		);
 	`)
 	if err != nil {
@@ -160,7 +164,7 @@ func TestReconcile_ActiveTurnSkipped(t *testing.T) {
 	}
 }
 
-// TestReconcile_Idempotency: turn already having response_at must not be modified.
+// TestReconcile_Idempotency: turn with subagent_tokens_settled=1 must not be reprocessed.
 func TestReconcile_Idempotency(t *testing.T) {
 	db := newTestDB(t)
 	dir := t.TempDir()
@@ -171,11 +175,11 @@ func TestReconcile_Idempotency(t *testing.T) {
 		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50}}}`,
 	})
 
-	// Turn already has response_at (Stop hook already wrote it)
+	// Turn already fully settled (subagent_tokens_settled=1).
 	alreadySet := time.Now().Add(-2 * time.Minute).UTC().Format(time.RFC3339)
 	_, err := db.Exec(
-		`INSERT INTO turns (session_id, prompt_at, response_at, transcript_path, prompt_line_offset, input_tokens) VALUES (?, ?, ?, ?, ?, ?)`,
-		"sess3", time.Now().Add(-3*time.Minute).UTC().Format(time.RFC3339), alreadySet, transcriptPath, 0, 999,
+		`INSERT INTO turns (session_id, prompt_at, response_at, transcript_path, prompt_line_offset, input_tokens, subagent_tokens_settled) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"sess3", time.Now().Add(-3*time.Minute).UTC().Format(time.RFC3339), alreadySet, transcriptPath, 0, 999, 1,
 	)
 	if err != nil {
 		t.Fatalf("insert turn: %v", err)
@@ -186,7 +190,7 @@ func TestReconcile_Idempotency(t *testing.T) {
 	var inputTokens int
 	db.QueryRow("SELECT input_tokens FROM turns WHERE session_id='sess3'").Scan(&inputTokens)
 	if inputTokens != 999 {
-		t.Errorf("input_tokens = %d, want 999 (must not be overwritten)", inputTokens)
+		t.Errorf("input_tokens = %d, want 999 (settled turn must not be overwritten)", inputTokens)
 	}
 }
 
@@ -218,6 +222,76 @@ func TestReconcile_StopHookWroteResponseAtButNoTokens(t *testing.T) {
 	db.QueryRow("SELECT input_tokens FROM turns WHERE session_id='sess4'").Scan(&inputTokens)
 	if !inputTokens.Valid || inputTokens.Int64 != 300 {
 		t.Errorf("input_tokens = %v, want 300 (reconcile must backfill tokens even when response_at already set)", inputTokens)
+	}
+}
+
+// TestReconcile_SubagentTokensSettled: Stop hook wrote response_at but subagent_tokens_settled=0
+// → reconcile picks it up and sets subagent_tokens_settled=1.
+// After second reconcile, the turn is skipped (settled=1).
+func TestReconcile_SubagentTokensSettled(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+
+	insertSession(t, db, "sess5", 0, 0)
+	transcriptPath := writeTranscriptLines(t, dir, []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":50,"output_tokens":20}}}`,
+	})
+
+	// Stop hook wrote response_at + tokens but subagent_tokens_settled=0
+	alreadySet := time.Now().Add(-1 * time.Minute).UTC().Format(time.RFC3339)
+	_, err := db.Exec(
+		`INSERT INTO turns (session_id, prompt_at, response_at, input_tokens, transcript_path, prompt_line_offset, subagent_tokens_settled) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		"sess5", time.Now().Add(-2*time.Minute).UTC().Format(time.RFC3339), alreadySet, 999, transcriptPath, 0, 0,
+	)
+	if err != nil {
+		t.Fatalf("insert turn: %v", err)
+	}
+
+	reconcile(db)
+
+	var settled int
+	var inputTokens int
+	db.QueryRow("SELECT subagent_tokens_settled, input_tokens FROM turns WHERE session_id='sess5'").Scan(&settled, &inputTokens)
+	if settled != 1 {
+		t.Errorf("subagent_tokens_settled = %d, want 1 after reconcile", settled)
+	}
+	// input_tokens should be re-computed from transcript (50), not left as 999
+	if inputTokens != 50 {
+		t.Errorf("input_tokens = %d, want 50 (re-computed by reconcile)", inputTokens)
+	}
+
+	// Second reconcile: settled=1, must be skipped entirely
+	// Overwrite input_tokens to verify it stays
+	db.Exec(`UPDATE turns SET input_tokens=888 WHERE session_id='sess5'`)
+	reconcile(db)
+	db.QueryRow("SELECT input_tokens FROM turns WHERE session_id='sess5'").Scan(&inputTokens)
+	if inputTokens != 888 {
+		t.Errorf("input_tokens = %d after second reconcile, want 888 (must not re-process settled turn)", inputTokens)
+	}
+}
+
+// TestReconcile_Cache5m1h: transcript with 5m/1h cache → DB fields filled correctly.
+func TestReconcile_Cache5m1h(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+
+	insertSession(t, db, "sess6", 0, 0)
+	transcriptPath := writeTranscriptLines(t, dir, []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":40,"cache_creation":{"ephemeral_5m_input_tokens":200,"ephemeral_1h_input_tokens":300}}}}`,
+	})
+
+	insertTurn(t, db, "sess6", transcriptPath, 0, time.Now().Add(-2*time.Minute))
+	reconcile(db)
+
+	var c5m, c1h sql.NullInt64
+	db.QueryRow("SELECT cache_creation_5m_tokens, cache_creation_1h_tokens FROM turns WHERE session_id='sess6'").Scan(&c5m, &c1h)
+	if !c5m.Valid || c5m.Int64 != 200 {
+		t.Errorf("cache_creation_5m_tokens = %v, want 200", c5m)
+	}
+	if !c1h.Valid || c1h.Int64 != 300 {
+		t.Errorf("cache_creation_1h_tokens = %v, want 300", c1h)
 	}
 }
 

@@ -34,7 +34,8 @@ func normalize(model string) string {
 }
 
 // Calculate returns estimated cost in USD, or nil for unknown models.
-func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation int) *float64 {
+// cacheCreate5m and cacheCreate1h are both priced at the cacheCreation rate.
+func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation, cacheCreate5m, cacheCreate1h int) *float64 {
 	p, ok := table[normalize(model)]
 	if !ok {
 		return nil
@@ -42,6 +43,8 @@ func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation
 	cost := float64(inputTokens)/1e6*p.input +
 		float64(outputTokens)/1e6*p.output +
 		float64(cacheRead)/1e6*p.cacheRead +
-		float64(cacheCreation)/1e6*p.cacheCreation
+		float64(cacheCreation)/1e6*p.cacheCreation +
+		float64(cacheCreate5m)/1e6*p.cacheCreation +
+		float64(cacheCreate1h)/1e6*p.cacheCreation
 	return &cost
 }

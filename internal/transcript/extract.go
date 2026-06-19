@@ -100,6 +100,69 @@ func ExtractWindow(path string, from, to int) (WindowResult, error) {
 	return result, nil
 }
 
+// ExtractLastTurn extracts token usage for the last user turn in the transcript.
+// Handles /clear race: if the last user entry has no following assistant entries,
+// falls back to the previous turn window.
+func ExtractLastTurn(path string) (WindowResult, error) {
+	all, err := loadTranscript(path)
+	if err != nil {
+		return WindowResult{}, err
+	}
+	if len(all) == 0 {
+		return WindowResult{}, nil
+	}
+
+	var result WindowResult
+
+	// Model: search entire transcript for last non-sidechain assistant entry.
+	for i := len(all) - 1; i >= 0; i-- {
+		e := all[i]
+		if e.Type == "assistant" && !e.IsSidechain && e.Message.Model != "" {
+			result.Model = e.Message.Model
+			break
+		}
+	}
+
+	lastUserIdx := -1
+	for i := len(all) - 1; i >= 0; i-- {
+		if all[i].Type == "user" && !all[i].IsSidechain {
+			lastUserIdx = i
+			break
+		}
+	}
+
+	acc := sumWindow(all, lastUserIdx+1, len(all))
+
+	if acc.InputTokens == 0 && acc.OutputTokens == 0 && lastUserIdx > 0 {
+		// /clear race: fallback to previous turn window.
+		prevUserIdx := -1
+		for i := lastUserIdx - 1; i >= 0; i-- {
+			if all[i].Type == "user" && !all[i].IsSidechain {
+				prevUserIdx = i
+				break
+			}
+		}
+		acc = sumWindow(all, prevUserIdx+1, lastUserIdx)
+	}
+
+	sub := extractSubagentTokens(path, all, lastUserIdx+1, len(all))
+	acc.InputTokens += sub.InputTokens
+	acc.OutputTokens += sub.OutputTokens
+	acc.CacheReadInputTokens += sub.CacheReadInputTokens
+	acc.CacheCreationInputTokens += sub.CacheCreationInputTokens
+	acc.CacheCreation.Ephemeral5m += sub.CacheCreation.Ephemeral5m
+	acc.CacheCreation.Ephemeral1h += sub.CacheCreation.Ephemeral1h
+
+	result.InputTokens = acc.InputTokens
+	result.OutputTokens = acc.OutputTokens
+	result.CacheReadTokens = acc.CacheReadInputTokens
+	result.CacheCreationTokens = acc.CacheCreationInputTokens
+	result.CacheCreate5m = acc.CacheCreation.Ephemeral5m
+	result.CacheCreate1h = acc.CacheCreation.Ephemeral1h
+
+	return result, nil
+}
+
 func loadTranscript(path string) ([]entry, error) {
 	if len(path) >= 2 && path[:2] == "~/" {
 		home, err := os.UserHomeDir()

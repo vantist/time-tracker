@@ -48,18 +48,20 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
 
 	var cost *float64
 	if tok.InputTokens > 0 || tok.OutputTokens > 0 {
-		cost = pricing.Calculate(sessionModel, tok.InputTokens, tok.OutputTokens, tok.CacheReadTokens, tok.CacheCreationTokens)
+		cost = pricing.Calculate(sessionModel, tok.InputTokens, tok.OutputTokens, tok.CacheReadTokens, tok.CacheCreationTokens, 0, 0)
 	}
 
-	// Update the latest turn for this session (highest rowid)
+	// Update the latest turn for this session (highest rowid).
+	// subagent_tokens_settled=0 signals reconcile to re-compute after process exits.
 	_, err := conn.Exec(`
 		UPDATE turns SET
-			response_at          = ?,
-			input_tokens         = CASE WHEN ? > 0 THEN ? ELSE input_tokens END,
-			output_tokens        = CASE WHEN ? > 0 THEN ? ELSE output_tokens END,
-			cache_read_tokens    = ?,
-			cache_creation_tokens = ?,
-			estimated_cost_usd   = ?
+			response_at            = ?,
+			input_tokens           = CASE WHEN ? > 0 THEN ? ELSE input_tokens END,
+			output_tokens          = CASE WHEN ? > 0 THEN ? ELSE output_tokens END,
+			cache_read_tokens      = ?,
+			cache_creation_tokens  = ?,
+			estimated_cost_usd     = ?,
+			subagent_tokens_settled = 0
 		WHERE id = (
 			SELECT id FROM turns WHERE session_id=? ORDER BY id DESC LIMIT 1
 		)`,
