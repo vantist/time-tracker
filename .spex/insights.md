@@ -134,6 +134,19 @@
   > **Why**: Same root cause as model-extraction bug. When Stop fires immediately after /clear, `lastUserIdx` points to the /clear user entry — primary range `[lastUserIdx+1, end)` is empty. Fallback searches `[prevUserIdx+1, lastUserIdx)` to retrieve tokens from the actual last turn.
   > **How to apply**: After primary range yields `total == 0`, find `prevUserIdx` (the user entry before `lastUserIdx`) and re-run dedup+sum on that window. Fixed in `cmd/tt/record.go:extractFromTranscript`.
 
-### Plan deviations
-
 - Task 6.2 (update SQL grouping) was listed as conditional work but turned out to be N/A: report SQL already uses `sessions.id` as group key, and turns now correctly reference stable ID, so no SQL change was needed.
+
+## 2026-06-19 — align-report-serve [spex-apply]
+
+**Promote candidates:**
+- [ ] addCost pointer-to-pointer float64 summation helper
+  > **Why**: Simple helper encapsulates DRY null-checking and value allocation logic when aggregating optional cost metrics.
+  > **How to apply**: Elevate to a general utility module (like pricing or pricing/helpers) if other reporting or logging modules perform cost sums on pointers.
+- [ ] Avoid JS template literals backticks inside Go raw string literals
+  > **Why**: Go's raw string literal delimiter is also the backtick (`). If JavaScript code inside `const HTML = `...`` uses backticks, it terminates the Go string early, breaking compilation.
+  > **How to apply**: Always use ES5-style string concatenation (e.g., `'h ' + h`) or convert Go's multi-line string to double-quoted escaped strings if JS template literals are required.
+
+**Plan deviations:** none
+
+---
+
