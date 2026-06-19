@@ -110,7 +110,8 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		       COALESCE(t.output_tokens, 0),
 		       COALESCE(t.cache_read_tokens, 0),
 		       COALESCE(t.cache_creation_tokens, 0),
-		       t.estimated_cost_usd
+		       t.estimated_cost_usd,
+		       COALESCE(s.tool, '')
 		FROM turns t
 		JOIN sessions s ON s.id = t.session_id
 		WHERE t.prompt_at >= ?`+projectFilter+`
@@ -130,15 +131,18 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		var promptStr, responseStr sql.NullString
 		var wi sql.NullString
 		var startedAt sql.NullString
+		var toolStr sql.NullString
 
 		if err := rows.Scan(
 			&r.sessionID, &r.project, &r.branch, &wi,
 			&r.model, &startedAt,
 			&promptStr, &responseStr,
 			&r.inputTok, &r.outputTok, &r.cacheRead, &r.cacheCreate, &r.cost,
+			&toolStr,
 		); err != nil {
 			return Result{}, err
 		}
+		r.tool = normalizeAgentName(toolStr.String)
 		r.workItem = wi.String
 		r.startedAt = startedAt.String
 		if promptStr.Valid {
@@ -166,6 +170,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 	type sessState struct {
 		project   string
 		branch    string
+		tool      string
 		model     string
 		startedAt string
 		workItem  string
@@ -200,7 +205,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		// per-session accumulation
 		ss := sessMap[r.sessionID]
 		if ss == nil {
-			ss = &sessState{project: r.project, branch: r.branch, model: r.model, startedAt: r.startedAt, workItem: r.workItem}
+			ss = &sessState{project: r.project, branch: r.branch, tool: r.tool, model: r.model, startedAt: r.startedAt, workItem: r.workItem}
 			sessMap[r.sessionID] = ss
 		}
 		ss.turns++
@@ -289,6 +294,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 			ID:           sid,
 			Project:      ss.project,
 			Branch:       ss.branch,
+			Tool:         ss.tool,
 			Model:        ss.model,
 			StartedAt:    ss.startedAt,
 			WorkItem:     ss.workItem,

@@ -34,6 +34,17 @@ func insertSession(t *testing.T, conn *sql.DB, id, project, branch, workItem str
 	}
 }
 
+func insertSessionFull(t *testing.T, conn *sql.DB, id, project, tool, model, branch, workItem string) {
+	t.Helper()
+	_, err := conn.Exec(
+		`INSERT OR IGNORE INTO sessions (id, project, tool, model, branch, work_item, started_at) VALUES (?,?,?,?,?,?,?)`,
+		id, project, tool, model, branch, workItem, time.Now().UTC().Format(time.RFC3339),
+	)
+	if err != nil {
+		t.Fatalf("insertSessionFull: %v", err)
+	}
+}
+
 func insertTurn(t *testing.T, conn *sql.DB, sessionID string, promptAt time.Time, responseAt *time.Time, cost *float64) {
 	t.Helper()
 	var ra interface{}
@@ -873,4 +884,26 @@ func TestDataStructures(t *testing.T) {
 		t.Errorf("expected marshaled Result to contain by_agent, got %s", string(data2))
 	}
 }
+
+func TestQueryToolField(t *testing.T) {
+	conn := openTestDB(t)
+	now := time.Now().UTC()
+
+	insertSessionFull(t, conn, "s1", "/proj", "claude-code", "gemini-2.5-flash", "main", "feat-1")
+	insertTurn(t, conn, "s1", now.Add(-time.Hour), ptr(now.Add(-time.Hour+time.Minute)), nil)
+
+	res, err := report.Query(conn, report.Options{Since: now.Add(-2 * time.Hour)})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+
+	if len(res.Sessions) != 1 {
+		t.Fatalf("expected 1 session, got %d", len(res.Sessions))
+	}
+
+	if res.Sessions[0].Tool != "Claude Code" {
+		t.Errorf("expected SessionRow.Tool to be %q, got %q", "Claude Code", res.Sessions[0].Tool)
+	}
+}
+
 
