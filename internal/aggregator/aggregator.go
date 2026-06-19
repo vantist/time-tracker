@@ -18,6 +18,7 @@ func AgentTime(turns []Turn) time.Duration {
 	return total
 }
 
+// Deprecated: use UserIntervals + MergeAndSum instead.
 // UserActiveTime sums inter-prompt gaps that are strictly less than idleThreshold.
 // If sessionStart is non-zero, the gap from sessionStart to the first prompt is also included.
 func UserActiveTime(turns []Turn, sessionStart time.Time, idleThreshold time.Duration) time.Duration {
