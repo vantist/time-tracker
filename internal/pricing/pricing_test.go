@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/user/tt/internal/pricing"
+	"github.com/user/tt/internal/transcript"
 )
 
 // Task 4.1: Scenario 1 from cost-estimation spec
@@ -99,3 +100,32 @@ func TestCalculate_Cache5m1h(t *testing.T) {
 		t.Errorf("cost = %f, want ~%f", *got, want)
 	}
 }
+
+func TestCalculateForUsage(t *testing.T) {
+	u := transcript.ModelUsage{
+		Model:               "claude-sonnet-4-6",
+		InputTokens:         1000,
+		OutputTokens:        200,
+		CacheReadTokens:     500,
+		CacheCreationTokens: 0,
+		CacheCreation5m:     1000,
+		CacheCreation1h:     2000,
+	}
+	got := pricing.CalculateForUsage(u)
+	if got == nil {
+		t.Fatal("expected non-nil cost")
+	}
+	// cost calculation:
+	// input: 1000 -> 1000/1e6 * 3.00 = 0.003
+	// output: 200 -> 200/1e6 * 15.00 = 0.003
+	// cache read: 500 -> 500/1e6 * 0.30 = 0.00015
+	// cache creation: 0
+	// 5m: 1000 -> 1000/1e6 * 3.75 = 0.00375
+	// 1h: 2000 -> 2000/1e6 * 3.75 = 0.00750
+	// total = 0.003 + 0.003 + 0.00015 + 0.00375 + 0.0075 = 0.01740
+	const want = 0.01740
+	if *got < want-0.000001 || *got > want+0.000001 {
+		t.Errorf("cost = %f, want ~%f", *got, want)
+	}
+}
+

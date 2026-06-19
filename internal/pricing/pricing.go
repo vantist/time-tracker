@@ -3,6 +3,8 @@ package pricing
 import (
 	"regexp"
 	"strings"
+
+	"github.com/user/tt/internal/transcript"
 )
 
 var dateSuffix = regexp.MustCompile(`-\d{8}$`)
@@ -47,4 +49,16 @@ func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation
 		float64(cacheCreate5m)/1e6*p.cacheCreation +
 		float64(cacheCreate1h)/1e6*p.cacheCreation
 	return &cost
+}
+
+func CalculateForUsage(u transcript.ModelUsage) *float64 {
+	return Calculate(
+		u.Model,
+		u.InputTokens,
+		u.OutputTokens,
+		u.CacheReadTokens,
+		u.CacheCreationTokens,
+		u.CacheCreation5m,
+		u.CacheCreation1h,
+	)
 }
