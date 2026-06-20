@@ -144,4 +144,4 @@ tt config set <key> <value>
 ```
 
 ---
-Related: [Architecture](../ARCHITECTURE.md)
+Related: [Architecture](../ARCHITECTURE.md) | [Conventions](conventions.md) | [Configuration](configuration.md)

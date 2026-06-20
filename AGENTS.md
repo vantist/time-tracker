@@ -6,6 +6,7 @@ Go CLI，透過 Claude Code / Copilot CLI hook 自動記錄 AI 工作時間與 t
 
 ```bash
 go build -o tt ./cmd/tt   # 建置
+go test ./...             # 執行測試
 tt setup --claude-code    # 安裝 Claude Code hooks
 tt report --since 7d      # 查看過去 7 天報表
 tt work "feature-xyz"     # 標記目前工作項目
@@ -15,6 +16,8 @@ tt work "feature-xyz"     # 標記目前工作項目
 
 - [ARCHITECTURE.md](ARCHITECTURE.md) — 模組結構、資料流、DB schema、設計決策
 - [docs/commands.md](docs/commands.md) — 完整指令參考、flag 說明、hook 設定範例
+- [docs/conventions.md](docs/conventions.md) — 專案開發與 Commit 規範
+- [docs/configuration.md](docs/configuration.md) — 系統變數、設定檔與配置鍵
 - [design.md](design.md) — Hook 整合設計筆記（Claude Code / Copilot CLI stdin 格式）
 
 ## Commit 規範

@@ -9,13 +9,13 @@
 **macOS（curl）**
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/vantist/time-checker/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/vantist/time-tracker/main/install.sh | sh
 ```
 
 **Windows（PowerShell）**
 
 ```powershell
-irm https://raw.githubusercontent.com/vantist/time-checker/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/vantist/time-tracker/main/install.ps1 | iex
 ```
 
 安裝至 `%USERPROFILE%\bin\tt.exe`，若該路徑不在 PATH 中，腳本會提示手動加入。
@@ -103,5 +103,7 @@ turns     — prompt/response 時間、token 用量、費用
 
 ## 文件
 
-- [Commands](docs/commands.md) — 完整旗標說明
 - [Architecture](ARCHITECTURE.md) — 模組結構與資料流
+- [Commands](docs/commands.md) — 完整指令參考與旗標說明
+- [Conventions](docs/conventions.md) — 專案開發與 Commit 規範
+- [Configuration](docs/configuration.md) — 系統變數、設定檔與配置鍵
