@@ -254,3 +254,55 @@ func TestRecordPromptSecondCallSameSession(t *testing.T) {
 		t.Errorf("expected 2 turns, got %d", count)
 	}
 }
+
+// Scenario: Antigravity 多步驟 prompt 去重
+func TestRecordPrompt_AntigravityDeduplication(t *testing.T) {
+	conn := openTestDB(t)
+
+	input := recorder.PromptInput{
+		SessionID: "sess-anti",
+		Project:   "/home/user/myproject",
+		Tool:      "antigravity",
+		Model:     "gemini-3.5-flash",
+	}
+
+	// 1. Record first prompt
+	if err := recorder.RecordPrompt(conn, input); err != nil {
+		t.Fatalf("first RecordPrompt: %v", err)
+	}
+
+	// Verify there is exactly 1 turn
+	var count int
+	conn.QueryRow("SELECT COUNT(*) FROM turns WHERE session_id='sess-anti'").Scan(&count)
+	if count != 1 {
+		t.Fatalf("expected 1 turn after first prompt, got %d", count)
+	}
+
+	// 2. Record second prompt (should be deduplicated because response_at is NULL)
+	if err := recorder.RecordPrompt(conn, input); err != nil {
+		t.Fatalf("second RecordPrompt: %v", err)
+	}
+
+	// Verify there is still exactly 1 turn
+	conn.QueryRow("SELECT COUNT(*) FROM turns WHERE session_id='sess-anti'").Scan(&count)
+	if count != 1 {
+		t.Errorf("expected 1 turn (deduplicated) after second prompt, got %d", count)
+	}
+
+	// 3. Close the active turn (simulate response hook)
+	_, err := conn.Exec("UPDATE turns SET response_at = ? WHERE session_id = ? AND response_at IS NULL", time.Now().UTC().Format(time.RFC3339), "sess-anti")
+	if err != nil {
+		t.Fatalf("update response_at: %v", err)
+	}
+
+	// 4. Record third prompt (should create a new turn because the previous one is closed)
+	if err := recorder.RecordPrompt(conn, input); err != nil {
+		t.Fatalf("third RecordPrompt: %v", err)
+	}
+
+	// Verify there are now 2 turns
+	conn.QueryRow("SELECT COUNT(*) FROM turns WHERE session_id='sess-anti'").Scan(&count)
+	if count != 2 {
+		t.Errorf("expected 2 turns after third prompt, got %d", count)
+	}
+}

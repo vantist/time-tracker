@@ -45,6 +45,17 @@ func RecordPrompt(conn *sql.DB, input PromptInput) error {
 		return fmt.Errorf("upsert session: %w", err)
 	}
 
+	if input.Tool == "antigravity" {
+		var activeCount int
+		err := conn.QueryRow(`SELECT COUNT(*) FROM turns WHERE session_id = ? AND response_at IS NULL`, stableID).Scan(&activeCount)
+		if err != nil {
+			return fmt.Errorf("check active turn: %w", err)
+		}
+		if activeCount > 0 {
+			return nil
+		}
+	}
+
 	// Use stable session ID for turns so JOIN sessions s ON s.id = t.session_id works.
 	offset := countLines(input.TranscriptPath)
 	var transcriptPath interface{}
@@ -57,7 +68,6 @@ func RecordPrompt(conn *sql.DB, input PromptInput) error {
 	)
 	return err
 }
-
 // countLines counts lines in the file using bufio.Scanner with a 1MB buffer.
 // Returns 0 if the file cannot be read.
 func countLines(path string) int {
