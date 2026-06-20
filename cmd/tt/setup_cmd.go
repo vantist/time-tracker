@@ -10,7 +10,7 @@ import (
 func init() {
 	rootCmd.AddCommand(setupCmd)
 	setupCmd.Flags().Bool("claude-code", false, "Set up Claude Code hooks")
-	setupCmd.Flags().Bool("copilot", false, "Show Copilot CLI hook setup instructions")
+	setupCmd.Flags().Bool("copilot", false, "Set up GitHub Copilot CLI hooks")
 	setupCmd.Flags().Bool("antigravity", false, "Set up Google Antigravity hooks")
 	setupCmd.Flags().Bool("codex", false, "Set up OpenAI Codex hooks")
 }
@@ -33,7 +33,10 @@ var setupCmd = &cobra.Command{
 		}
 
 		if copilot {
-			fmt.Print(setup.CopilotInstructions)
+			if err := setup.SetupCopilot(); err != nil {
+				return err
+			}
+			fmt.Println("GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json")
 			return nil
 		}
 

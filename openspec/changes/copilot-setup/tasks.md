@@ -9,6 +9,6 @@
 
 ## 3. CLI 整合與驗證
 
-- [ ] 3.1 修改 `cmd/tt/setup_cmd.go` 中的 `--copilot` 旗標處理邏輯，將原本列印 `CopilotInstructions` 的行為替換為呼叫 `setup.SetupCopilot()`。
+- [x] 3.1 修改 `cmd/tt/setup_cmd.go` 中的 `--copilot` 旗標處理邏輯，將原本列印 `CopilotInstructions` 的行為替換為呼叫 `setup.SetupCopilot()`。
 - [ ] 3.2 刪除/清理 `internal/setup/setup.go` 中不再使用的 `CopilotInstructions` 常數。
 - [ ] 3.3 執行完整的 `go test ./...` 確保專案內所有測試皆通過。
