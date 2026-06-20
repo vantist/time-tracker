@@ -74,6 +74,8 @@ type danglingTurn struct {
 }
 
 func reconcile(conn *sql.DB) {
+	repairSessions(conn)
+
 	rows, err := conn.Query(`
 		SELECT
 			t.id, t.session_id, t.transcript_path, t.prompt_line_offset, t.prompt_at,

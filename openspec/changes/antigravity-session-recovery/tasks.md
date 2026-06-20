@@ -3,7 +3,7 @@
 - [x] 1.1 在 `internal/reconcile/reconcile_test.go` 中寫入對 `repairSessions` 的測試案例（包含缺失 `project` 或 `model` 欄位，從 transcript 檔案路徑解析，並遞迴尋找專案根目錄的預期行為）。測試目前應失敗。
 - [x] 1.2 在 `internal/reconcile/reconcile.go` 中實作 `repairSessions(db *sql.DB)` 函數（解析 transcript_full.jsonl、過濾系統路徑、遞迴尋找專案根目錄、更新 session 欄位）。
 - [x] 1.3 執行測試並驗證 `repairSessions` 單元測試通過。
-- [ ] 1.4 在 `internal/reconcile/reconcile.go` 中修改 `reconcile` 流程，使其在最開始呼叫 `repairSessions`，並更新相關整合測試以驗證歷史 Session 自動修補整合成功。
+- [x] 1.4 在 `internal/reconcile/reconcile.go` 中修改 `reconcile` 流程，使其在最開始呼叫 `repairSessions`，並更新相關整合測試以驗證歷史 Session 自動修補整合成功。
 
 ## 2. 進程存活超時自動關閉 (idle-threshold)
 
