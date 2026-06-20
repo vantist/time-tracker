@@ -129,3 +129,24 @@ func TestCalculateForUsage(t *testing.T) {
 	}
 }
 
+func TestCalculateGpt54(t *testing.T) {
+	got := pricing.Calculate("gpt-5.4", 1_000_000, 0, 0, 0, 0, 0)
+	if got == nil {
+		t.Fatal("expected non-nil cost for gpt-5.4")
+	}
+	const want = 5.00
+	if *got < want-0.001 || *got > want+0.001 {
+		t.Errorf("cost = %f, want ~%f", *got, want)
+	}
+}
+
+func TestCalculateGpt5Mini(t *testing.T) {
+	got := pricing.Calculate("gpt-5-mini", 1_000_000, 0, 0, 0, 0, 0)
+	if got == nil {
+		t.Fatal("expected non-nil cost for gpt-5-mini")
+	}
+	const want = 0.15
+	if *got < want-0.001 || *got > want+0.001 {
+		t.Errorf("cost = %f, want ~%f", *got, want)
+	}
+}

@@ -26,6 +26,8 @@ var table = map[string]modelPricing{
 	"claude-sonnet-4-5": {3.00, 15.00, 0.30, 3.75},
 	"claude-haiku-4-5":  {1.00, 5.00, 0.10, 1.25},
 	"claude-haiku-3-5":  {0.80, 4.00, 0.08, 1.00},
+	"gpt-5.4":           {5.00, 15.00, 0.50, 6.25},
+	"gpt-5-mini":        {0.15, 0.60, 0.015, 0.1875},
 }
 
 func normalize(model string) string {
