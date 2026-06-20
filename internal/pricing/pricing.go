@@ -75,10 +75,10 @@ func Calculate(model string, inputTokens, outputTokens, cacheRead, cacheCreation
 		return nil
 	}
 	totalCreation := cacheCreation + cacheCreate5m + cacheCreate1h
-	cost := float64(inputTokens)/1e6*p.input +
-		float64(outputTokens)/1e6*p.output +
-		float64(cacheRead)/1e6*p.cacheRead +
-		float64(totalCreation)/1e6*p.cacheCreation
+	cost := (float64(inputTokens)*p.input +
+		float64(outputTokens)*p.output +
+		float64(cacheRead)*p.cacheRead +
+		float64(totalCreation)*p.cacheCreation) / 1e6
 	return &cost
 }
 
