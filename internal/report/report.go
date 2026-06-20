@@ -21,26 +21,34 @@ type Options struct {
 }
 
 type SessionRow struct {
-	ID           string   `json:"id"`
-	Project      string   `json:"project"`
-	Branch       string   `json:"branch"`
-	Tool         string   `json:"tool"`
-	Model        string   `json:"model"`
-	StartedAt    string   `json:"started_at"`
-	WorkItem     string   `json:"work_item"`
-	Turns        int      `json:"turns"`
-	AgentTimeSec int64    `json:"agent_time_sec"`
-	UserTimeSec  int64    `json:"user_time_sec"`
-	CostUSD      *float64 `json:"cost_usd"`
+	ID                  string   `json:"id"`
+	Project             string   `json:"project"`
+	Branch              string   `json:"branch"`
+	Tool                string   `json:"tool"`
+	Model               string   `json:"model"`
+	StartedAt           string   `json:"started_at"`
+	WorkItem            string   `json:"work_item"`
+	Turns               int      `json:"turns"`
+	AgentTimeSec        int64    `json:"agent_time_sec"`
+	UserTimeSec         int64    `json:"user_time_sec"`
+	CostUSD             *float64 `json:"cost_usd"`
+	InputTokens         int64    `json:"input_tokens"`
+	OutputTokens        int64    `json:"output_tokens"`
+	CacheReadTokens     int64    `json:"cache_read_tokens"`
+	CacheCreationTokens int64    `json:"cache_creation_tokens"`
 }
 
 type AgentSummary struct {
-	Agent     string  `json:"agent"`
-	Sessions  int     `json:"sessions"`
-	AgentTime string  `json:"agent_time"`
-	UserTime  string  `json:"user_time"`
-	Tokens    string  `json:"tokens"`
-	Cost      float64 `json:"cost"`
+	Agent               string  `json:"agent"`
+	Sessions            int     `json:"sessions"`
+	AgentTime           string  `json:"agent_time"`
+	UserTime            string  `json:"user_time"`
+	Tokens              string  `json:"tokens"`
+	Cost                float64 `json:"cost"`
+	InputTokens         int64   `json:"input_tokens"`
+	OutputTokens        int64   `json:"output_tokens"`
+	CacheReadTokens     int64   `json:"cache_read_tokens"`
+	CacheCreationTokens int64   `json:"cache_creation_tokens"`
 }
 
 type ModelUsageSummary struct {
@@ -75,29 +83,37 @@ type Result struct {
 }
 
 type ProjectSummary struct {
-	Project            string   `json:"project"`
-	SessionsCount      int      `json:"sessions"`
-	AgentTimeSec       int64    `json:"agent_time_seconds"`
-	UserActiveTimeSec  int64    `json:"user_active_time_sec"`
-	CostUSD            *float64 `json:"cost_usd"`
-	InputTokens        int64    `json:"input_tokens"`
-	OutputTokens       int64    `json:"output_tokens"`
+	Project             string   `json:"project"`
+	SessionsCount       int      `json:"sessions"`
+	AgentTimeSec        int64    `json:"agent_time_seconds"`
+	UserActiveTimeSec   int64    `json:"user_active_time_sec"`
+	CostUSD             *float64 `json:"cost_usd"`
+	InputTokens         int64    `json:"input_tokens"`
+	OutputTokens        int64    `json:"output_tokens"`
+	CacheReadTokens     int64    `json:"cache_read_tokens"`
+	CacheCreationTokens int64    `json:"cache_creation_tokens"`
 }
 
 type DailyStat struct {
-	Date         string `json:"date"`
-	Sessions     int    `json:"sessions"`
-	InputTokens  int64  `json:"input_tokens"`
-	OutputTokens int64  `json:"output_tokens"`
+	Date                string `json:"date"`
+	Sessions            int    `json:"sessions"`
+	InputTokens         int64  `json:"input_tokens"`
+	OutputTokens        int64  `json:"output_tokens"`
+	CacheReadTokens     int64  `json:"cache_read_tokens"`
+	CacheCreationTokens int64  `json:"cache_creation_tokens"`
 }
 
 type GroupResult struct {
-	Label             string   `json:"label"`
-	Project           string   `json:"project"`
-	SessionsCount     int      `json:"sessions_count"`
-	AgentTimeSec      int64    `json:"agent_time_sec"`
-	UserActiveTimeSec int64    `json:"user_active_time_sec"`
-	EstimatedCostUSD  *float64 `json:"estimated_cost_usd"`
+	Label               string   `json:"label"`
+	Project             string   `json:"project"`
+	SessionsCount       int      `json:"sessions_count"`
+	AgentTimeSec        int64    `json:"agent_time_sec"`
+	UserActiveTimeSec   int64    `json:"user_active_time_sec"`
+	EstimatedCostUSD    *float64 `json:"estimated_cost_usd"`
+	InputTokens         int64    `json:"input_tokens"`
+	OutputTokens        int64    `json:"output_tokens"`
+	CacheReadTokens     int64    `json:"cache_read_tokens"`
+	CacheCreationTokens int64    `json:"cache_creation_tokens"`
 }
 
 func Query(conn *sql.DB, opts Options) (Result, error) {
