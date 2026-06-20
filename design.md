@@ -87,5 +87,6 @@ stdin takes precedence when available (non-empty stdin detected via `os.Stdin.St
 
 ## Open Questions
 
-- [ ] Stop hook token fields — test empirically during Task 9.2 whether Claude Code Stop stdin includes usage data.
-  If not present, token capture may require `PostToolUse` hook or alternate strategy.
+- [x] Stop hook token fields — test empirically whether Claude Code Stop stdin includes usage data.
+  **Resolution**: Checked empirically; Claude Code Stop hook stdin does not include usage data. Instead, `tt record response` parses the local transcript JSONL file.
+
