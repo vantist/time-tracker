@@ -138,6 +138,12 @@ const fmtTime = sec => {
 const fmtCost = c => c == null ? 'N/A' : '$' + c.toFixed(4);
 const esc = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+const makeTooltipCell = (input, output, cacheRead, cacheCreate) => {
+  const total = (input || 0) + (output || 0);
+  const text = 'Input: ' + fmt(input) + '\nOutput: ' + fmt(output) + '\nCache read: ' + fmt(cacheRead) + '\nCache create: ' + fmt(cacheCreate);
+  return '<td><div class="tooltip" data-tooltip="' + esc(text) + '">' + fmt(total) + '</div></td>';
+};
+
 function render(d) {
   document.getElementById('v-sessions').textContent = d.sessions_count || 0;
   document.getElementById('v-agent').textContent = fmtTime(d.agent_time_sec || 0);
@@ -193,7 +199,7 @@ function render(d) {
       }
       const tr = document.createElement('tr');
       const role = mu.is_subagent ? 'Subagent' : 'Main';
-      tr.innerHTML = '<td><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:' + colors[idx % colors.length] + '; margin-right:8px;"></span>' + esc(mu.model) + '</td><td>' + role + '</td><td>' + fmt(mu.input_tokens) + '</td><td>' + fmt(mu.output_tokens) + '</td><td>' + fmtCost(mu.estimated_cost_usd) + '</td>';
+      tr.innerHTML = '<td><span style="display:inline-block; width:8px; height:8px; border-radius:50%; background-color:' + colors[idx % colors.length] + '; margin-right:8px;"></span>' + esc(mu.model) + '</td><td>' + role + '</td>' + makeTooltipCell(mu.input_tokens, mu.output_tokens, mu.cache_read_tokens, mu.cache_creation_tokens) + '<td>' + fmtCost(mu.estimated_cost_usd) + '</td>';
       mBody.appendChild(tr);
     });
   }
@@ -202,7 +208,7 @@ function render(d) {
   projBody.innerHTML = '';
   (d.by_project || []).forEach(p => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + esc(p.project) + '</td><td>' + p.sessions + '</td><td>' + fmtTime(p.agent_time_seconds || 0) + '</td><td>' + fmtTime(p.user_active_time_sec || 0) + '</td><td>' + fmt(p.input_tokens) + ' / ' + fmt(p.output_tokens) + '</td><td>' + fmtCost(p.cost_usd) + '</td>';
+    tr.innerHTML = '<td>' + esc(p.project) + '</td><td>' + p.sessions + '</td><td>' + fmtTime(p.agent_time_seconds || 0) + '</td><td>' + fmtTime(p.user_active_time_sec || 0) + '</td>' + makeTooltipCell(p.input_tokens, p.output_tokens, p.cache_read_tokens, p.cache_creation_tokens) + '<td>' + fmtCost(p.cost_usd) + '</td>';
     projBody.appendChild(tr);
   });
 
@@ -210,7 +216,7 @@ function render(d) {
   agentBody.innerHTML = '';
   (d.by_agent || []).forEach(a => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + esc(a.agent) + '</td><td>' + a.sessions + '</td><td>' + esc(a.agent_time) + '</td><td>' + esc(a.user_time) + '</td><td>' + esc(a.tokens) + '</td><td>' + fmtCost(a.cost) + '</td>';
+    tr.innerHTML = '<td>' + esc(a.agent) + '</td><td>' + a.sessions + '</td><td>' + esc(a.agent_time) + '</td><td>' + esc(a.user_time) + '</td>' + makeTooltipCell(a.input_tokens, a.output_tokens, a.cache_read_tokens, a.cache_creation_tokens) + '<td>' + fmtCost(a.cost) + '</td>';
     agentBody.appendChild(tr);
   });
 
@@ -221,7 +227,7 @@ function render(d) {
   wiBody.innerHTML = '';
   groups.forEach(g => {
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>' + esc(g.label) + '</td><td>' + esc(g.project) + '</td><td>' + (g.sessions_count || 0) + '</td><td>' + fmtTime(g.agent_time_sec || 0) + '</td><td>' + fmtTime(g.user_active_time_sec || 0) + '</td><td>' + fmtCost(g.estimated_cost_usd) + '</td>';
+    tr.innerHTML = '<td>' + esc(g.label) + '</td><td>' + esc(g.project) + '</td><td>' + (g.sessions_count || 0) + '</td><td>' + fmtTime(g.agent_time_sec || 0) + '</td><td>' + fmtTime(g.user_active_time_sec || 0) + '</td>' + makeTooltipCell(g.input_tokens, g.output_tokens, g.cache_read_tokens, g.cache_creation_tokens) + '<td>' + fmtCost(g.estimated_cost_usd) + '</td>';
     wiBody.appendChild(tr);
   });
 
@@ -230,7 +236,7 @@ function render(d) {
   (d.sessions || []).forEach(s => {
     const tr = document.createElement('tr');
     const t = new Date(s.started_at || 0);
-    tr.innerHTML = '<td>' + t.toLocaleString() + '</td><td>' + esc(s.project) + '</td><td>' + esc(s.branch) + '</td><td>' + esc(s.tool) + '</td><td>' + esc(s.model) + '</td><td>' + (s.turns || 0) + '</td><td>' + fmtTime(s.agent_time_sec || 0) + '</td><td>' + fmtTime(s.user_time_sec || 0) + '</td><td>' + esc(s.work_item) + '</td><td>' + fmtCost(s.cost_usd) + '</td>';
+    tr.innerHTML = '<td>' + t.toLocaleString() + '</td><td>' + esc(s.project) + '</td><td>' + esc(s.branch) + '</td><td>' + esc(s.tool) + '</td><td>' + esc(s.model) + '</td><td>' + (s.turns || 0) + '</td><td>' + fmtTime(s.agent_time_sec || 0) + '</td><td>' + fmtTime(s.user_time_sec || 0) + '</td><td>' + esc(s.work_item) + '</td>' + makeTooltipCell(s.input_tokens, s.output_tokens, s.cache_read_tokens, s.cache_creation_tokens) + '<td>' + fmtCost(s.cost_usd) + '</td>';
     sessBody.appendChild(tr);
   });
 

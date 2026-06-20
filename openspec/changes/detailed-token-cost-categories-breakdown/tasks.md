@@ -15,4 +15,4 @@
 
 - [x] 3.1 Write a failing unit test in `internal/report/html_test.go` verifying that `/api/report` response contains the new token fields.
 - [x] 3.2 Add `.tooltip` CSS styles and update HTML table structures in `internal/report/html.go` to display a single "Tokens" column with hover tooltip containing the 4-category breakdown.
-- [ ] 3.3 Update client-side javascript `render` function in `internal/report/html.go` to build interactive tooltips for By Project, By Agent, By Model & Role, By Work Item, and Sessions tables. Verify the test passes.
+- [x] 3.3 Update client-side javascript `render` function in `internal/report/html.go` to build interactive tooltips for By Project, By Agent, By Model & Role, By Work Item, and Sessions tables. Verify the test passes.
