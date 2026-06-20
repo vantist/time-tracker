@@ -34,25 +34,25 @@ func getAntigravityModel(all []entry) string {
 	}
 
 	home, err := os.UserHomeDir()
-	if err == nil {
-		paths := []string{
-			filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"),
-			filepath.Join(home, ".gemini", "antigravity", "settings.json"),
-		}
+	if err != nil {
+		return "gemini-3.5-flash"
+	}
 
-		for _, p := range paths {
-			f, err := os.Open(p)
-			if err != nil {
-				continue
-			}
-			var cfg struct {
-				Model string `json:"model"`
-			}
-			err = json.NewDecoder(f).Decode(&cfg)
-			f.Close()
-			if err == nil && cfg.Model != "" {
-				return cleanAntigravityModel(cfg.Model)
-			}
+	paths := []string{
+		filepath.Join(home, ".gemini", "antigravity-cli", "settings.json"),
+		filepath.Join(home, ".gemini", "antigravity", "settings.json"),
+	}
+
+	for _, p := range paths {
+		data, err := os.ReadFile(p)
+		if err != nil {
+			continue
+		}
+		var cfg struct {
+			Model string `json:"model"`
+		}
+		if err := json.Unmarshal(data, &cfg); err == nil && cfg.Model != "" {
+			return cleanAntigravityModel(cfg.Model)
 		}
 	}
 
@@ -66,7 +66,7 @@ func cleanAntigravityModel(name string) string {
 		name = name[:i]
 	}
 	name = strings.TrimSpace(name)
-	// Replace spaces/dots/hyphens with a single hyphen
+	// Replace spaces/hyphens with a single hyphen, keeping alphanumeric characters and dots
 	var result []rune
 	lastIsDash := false
 	for _, r := range name {
