@@ -8,7 +8,7 @@
 
 - [x] 2.1 Write failing unit tests in `internal/report/report_test.go` to verify that `FormatText` prints all four categories (Input, Output, Cache read, Cache create) for all tables by default.
 - [x] 2.2 Update `FormatText` in `internal/report/report.go` to include cache token columns and display the 4-category breakdown for all tables. Verify the tests pass.
-- [ ] 2.3 Write a failing unit test in `cmd/tt/setup_cmd_test.go` (or a new test file) to verify the new `--output` / `-o` flag in the report command writes report contents directly to a file with `0600` permissions.
+- [x] 2.3 Write a failing unit test in `cmd/tt/setup_cmd_test.go` (or a new test file) to verify the new `--output` / `-o` flag in the report command writes report contents directly to a file with `0600` permissions.
 - [ ] 2.4 Add standard flag `-o` / `--output` to `reportCmd` in `cmd/tt/report_cmd.go` and implement the file output write logic. Verify the tests pass.
 
 ## 3. Web Dashboard Tooltips & Tables (TDD)
