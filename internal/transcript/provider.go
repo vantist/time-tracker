@@ -76,6 +76,14 @@ func (p *AntigravityProvider) ResolvePath(sessionID string, stdinPath string) st
 	return filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
 }
 
+func (p *AntigravityProvider) ExtractWindow(path string, fromOffset int, toOffset int) (WindowResult, error) {
+	return ParseAntigravityLog(path)
+}
+
+func (p *AntigravityProvider) ExtractLastTurn(path string) (WindowResult, error) {
+	return ParseAntigravityLog(path)
+}
+
 // CodexProvider handles OpenAI Codex log format.
 type CodexProvider struct {
 	JSONLProvider

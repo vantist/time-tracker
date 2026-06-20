@@ -437,3 +437,66 @@ func TestReconcile_TurnModelUsages(t *testing.T) {
 		t.Errorf("turns cost pre-aggregated sum wrong: %f, want ~0.000455", turnCost)
 	}
 }
+
+func TestReconcile_AntigravityZeroTokens(t *testing.T) {
+	db := newTestDB(t)
+	dir := t.TempDir()
+	t.Setenv("HOME", dir)
+
+	// Create settings.json
+	cliConfigDir := filepath.Join(dir, ".gemini", "antigravity-cli")
+	if err := os.MkdirAll(cliConfigDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	settingsPath := filepath.Join(cliConfigDir, "settings.json")
+	if err := os.WriteFile(settingsPath, []byte(`{"model": "Gemini 3.5 Flash"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Create session with tool: antigravity
+	_, err := db.Exec(`
+		INSERT INTO sessions (id, started_at, process_pid, process_start, tool) 
+		VALUES (?, ?, ?, ?, ?)`,
+		"sess-anti-rec", time.Now().UTC().Format(time.RFC3339), 8888, 1700000000, "antigravity",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Write empty transcript (typical for antigravity turns before stop/shutdown)
+	path := filepath.Join(dir, "transcript.jsonl")
+	if err := os.WriteFile(path, []byte(`{"type":"PLANNER_RESPONSE"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Insert dangling turn (response_at is NULL, tokens are NULL)
+	turnID := insertTurn(t, db, "sess-anti-rec", path, 1, time.Now().Add(-10*time.Second))
+
+	// Reconcile
+	reconcile(db)
+
+	// Verify turn is reconciled
+	var responseAt sql.NullString
+	var model sql.NullString
+	var inputTokens, outputTokens sql.NullInt64
+	var settled bool
+	err = db.QueryRow("SELECT response_at, model, input_tokens, output_tokens, subagent_tokens_settled FROM turns WHERE id=?", turnID).Scan(
+		&responseAt, &model, &inputTokens, &outputTokens, &settled,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if !responseAt.Valid || responseAt.String == "" {
+		t.Error("expected response_at to be set by reconcile for antigravity")
+	}
+	if !model.Valid || model.String != "gemini-3.5-flash" {
+		t.Errorf("expected model to be gemini-3.5-flash, got %q", model.String)
+	}
+	if !inputTokens.Valid || inputTokens.Int64 != 0 {
+		t.Errorf("expected input_tokens = 0, got %v", inputTokens)
+	}
+	if !settled {
+		t.Error("expected subagent_tokens_settled to be true")
+	}
+}

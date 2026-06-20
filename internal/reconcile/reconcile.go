@@ -169,7 +169,7 @@ func reconcileTurn(conn *sql.DB, dt danglingTurn) error {
 	if err != nil {
 		return err
 	}
-	if result.InputTokens() == 0 && result.OutputTokens() == 0 {
+	if result.InputTokens() == 0 && result.OutputTokens() == 0 && tool != "antigravity" {
 		return nil
 	}
 
