@@ -20,6 +20,6 @@
 
 ## 5. 整合與驗證
 
-- [ ] 5.1 修改 `cmd/tt/record.go` 中的 stop 錄製邏輯，改為透過 `GetProvider(tool)` 獲取 Provider 擷取 token
-- [ ] 5.2 修改 `internal/reconcile/reconcile.go`，使用 `GetProvider(tool)` 重構 `reconcileTurn` 中的日誌擷取邏輯，確保所有工具的增量窗口比對邏輯一致
-- [ ] 5.3 執行所有單元測試與整合測試 (`go test ./...`)，確保無 regression
+- [x] 5.1 修改 `cmd/tt/record.go` 中的 stop 錄製邏輯，改為透過 `GetProvider(tool)` 獲取 Provider 擷取 token
+- [x] 5.2 修改 `internal/reconcile/reconcile.go`，使用 `GetProvider(tool)` 重構 `reconcileTurn` 中的日誌擷取邏輯，確保所有工具的增量窗口比對邏輯一致
+- [x] 5.3 執行所有單元測試與整合測試 (`go test ./...`)，確保無 regression
