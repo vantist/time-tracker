@@ -143,36 +143,39 @@ func TestGetAntigravityModel(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("HOME", tmpDir)
 
-	// Case 1: No settings file, should default to gemini-3.5-flash
-	if model := transcript.GetAntigravityModel(nil); model != "gemini-3.5-flash" {
-		t.Errorf("expected default model gemini-3.5-flash, got %q", model)
-	}
+	t.Run("default model when settings missing", func(t *testing.T) {
+		if model := transcript.GetAntigravityModel(nil); model != "gemini-3.5-flash" {
+			t.Errorf("expected default model gemini-3.5-flash, got %q", model)
+		}
+	})
 
-	// Case 2: Settings file in ~/.gemini/antigravity/settings.json
-	configDir := filepath.Join(tmpDir, ".gemini", "antigravity")
-	if err := os.MkdirAll(configDir, 0o700); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
-	}
-	settingsPath := filepath.Join(configDir, "settings.json")
-	if err := os.WriteFile(settingsPath, []byte(`{"model": "Gemini 1.5 Pro"}`), 0o600); err != nil {
-		t.Fatalf("failed to write settings: %v", err)
-	}
+	t.Run("fallback settings model", func(t *testing.T) {
+		configDir := filepath.Join(tmpDir, ".gemini", "antigravity")
+		if err := os.MkdirAll(configDir, 0o700); err != nil {
+			t.Fatalf("failed to create config dir: %v", err)
+		}
+		settingsPath := filepath.Join(configDir, "settings.json")
+		if err := os.WriteFile(settingsPath, []byte(`{"model": "Gemini 1.5 Pro"}`), 0o600); err != nil {
+			t.Fatalf("failed to write settings: %v", err)
+		}
 
-	if model := transcript.GetAntigravityModel(nil); model != "gemini-1.5-pro" {
-		t.Errorf("expected gemini-1.5-pro, got %q", model)
-	}
+		if model := transcript.GetAntigravityModel(nil); model != "gemini-1.5-pro" {
+			t.Errorf("expected gemini-1.5-pro, got %q", model)
+		}
+	})
 
-	// Case 3: Settings file in ~/.gemini/antigravity-cli/settings.json takes precedence
-	cliConfigDir := filepath.Join(tmpDir, ".gemini", "antigravity-cli")
-	if err := os.MkdirAll(cliConfigDir, 0o700); err != nil {
-		t.Fatalf("failed to create config dir: %v", err)
-	}
-	cliSettingsPath := filepath.Join(cliConfigDir, "settings.json")
-	if err := os.WriteFile(cliSettingsPath, []byte(`{"model": "Gemini 3.5 Flash (Medium)"}`), 0o600); err != nil {
-		t.Fatalf("failed to write settings: %v", err)
-	}
+	t.Run("cli settings model precedence", func(t *testing.T) {
+		cliConfigDir := filepath.Join(tmpDir, ".gemini", "antigravity-cli")
+		if err := os.MkdirAll(cliConfigDir, 0o700); err != nil {
+			t.Fatalf("failed to create config dir: %v", err)
+		}
+		cliSettingsPath := filepath.Join(cliConfigDir, "settings.json")
+		if err := os.WriteFile(cliSettingsPath, []byte(`{"model": "Gemini 3.5 Flash (Medium)"}`), 0o600); err != nil {
+			t.Fatalf("failed to write settings: %v", err)
+		}
 
-	if model := transcript.GetAntigravityModel(nil); model != "gemini-3.5-flash" {
-		t.Errorf("expected gemini-3.5-flash, got %q", model)
-	}
+		if model := transcript.GetAntigravityModel(nil); model != "gemini-3.5-flash" {
+			t.Errorf("expected gemini-3.5-flash, got %q", model)
+		}
+	})
 }
