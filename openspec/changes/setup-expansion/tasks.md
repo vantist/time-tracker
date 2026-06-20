@@ -6,8 +6,8 @@
 
 ## 2. Antigravity 及 Codex 整合 (TDD)
 
-- [ ] 2.1 在 `internal/setup/setup_test.go` 中為 `SetupAntigravity()` 與 `SetupCodex()` 撰寫單元測試用例，驗證其寫入對應的 hooks 結構與冪等性
-- [ ] 2.2 在 `internal/setup/setup.go` 中實作 `SetupAntigravity()` 與 `SetupCodex()`，呼叫 `mergeHooksFile` 實現相應邏輯，並使測試通過
+- [x] 2.1 在 `internal/setup/setup_test.go` 中為 `SetupAntigravity()` 與 `SetupCodex()` 撰寫單元測試用例，驗證其寫入對應的 hooks 結構與冪等性
+- [x] 2.2 在 `internal/setup/setup.go` 中實作 `SetupAntigravity()` 與 `SetupCodex()`，呼叫 `mergeHooksFile` 實現相應邏輯，並使測試通過
 - [ ] 2.3 在 `cmd/tt/setup_cmd.go` 中加入 `--antigravity` 與 `--codex` flag 參數與對接，並為 CLI 參數撰寫/執行整合測試
 
 ## 3. Record Stdin Payload 解析支援 (TDD)
