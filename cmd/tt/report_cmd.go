@@ -54,24 +54,16 @@ var reportCmd = &cobra.Command{
 			return err
 		}
 
-		if result.Empty {
-			msg := "No data for the selected period.\n"
-			if outputFile != "" {
-				if err := os.WriteFile(outputFile, []byte(msg), 0600); err != nil {
-					return fmt.Errorf("failed to write output file: %w", err)
-				}
-			} else {
-				fmt.Print(msg)
-			}
-			return nil
-		}
-
 		var content string
-		switch format {
-		case "json":
-			content = report.FormatJSON(result) + "\n"
-		default:
-			content = report.FormatText(result)
+		if result.Empty {
+			content = "No data for the selected period.\n"
+		} else {
+			switch format {
+			case "json":
+				content = report.FormatJSON(result) + "\n"
+			default:
+				content = report.FormatText(result)
+			}
 		}
 
 		if outputFile != "" {

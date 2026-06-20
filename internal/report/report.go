@@ -373,7 +373,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 			Sessions:            len(as.sessions),
 			AgentTime:           formatTime(agentSec),
 			UserTime:            formatTime(userSec),
-			Tokens:              fmt.Sprintf("%s / %s / %s / %s", formatInt(as.inputTokens), formatInt(as.outputTokens), formatInt(as.cacheRead), formatInt(as.cacheCreate)),
+			Tokens:              formatTokens(as.inputTokens, as.outputTokens, as.cacheRead, as.cacheCreate),
 			Cost:                costVal,
 			InputTokens:         as.inputTokens,
 			OutputTokens:        as.outputTokens,
@@ -574,11 +574,6 @@ func FormatText(r Result) string {
 		return "No data for the selected period.\n"
 	}
 
-	agentH := r.AgentTimeSec / 3600
-	agentM := (r.AgentTimeSec % 3600) / 60
-	userH := r.UserActiveTimeSec / 3600
-	userM := (r.UserActiveTimeSec % 3600) / 60
-
 	cost := "N/A"
 	if r.EstimatedCostUSD != nil {
 		cost = fmt.Sprintf("$%.4f", *r.EstimatedCostUSD)
@@ -586,8 +581,8 @@ func FormatText(r Result) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "Sessions:    %d\n", r.SessionsCount)
-	fmt.Fprintf(&b, "Agent time:  %dh %dm\n", agentH, agentM)
-	fmt.Fprintf(&b, "User active: %dh %dm\n\n", userH, userM)
+	fmt.Fprintf(&b, "Agent time:  %s\n", formatTime(r.AgentTimeSec))
+	fmt.Fprintf(&b, "User active: %s\n\n", formatTime(r.UserActiveTimeSec))
 
 	// Tokens block
 	fmt.Fprintf(&b, "─── Tokens ───\n")
@@ -653,7 +648,7 @@ func FormatText(r Result) string {
 				p.SessionsCount,
 				formatTime(p.AgentTimeSec),
 				formatTime(p.UserActiveTimeSec),
-				fmt.Sprintf("%s / %s / %s / %s", formatInt(p.InputTokens), formatInt(p.OutputTokens), formatInt(p.CacheReadTokens), formatInt(p.CacheCreationTokens)),
+				formatTokens(p.InputTokens, p.OutputTokens, p.CacheReadTokens, p.CacheCreationTokens),
 				pcost,
 			)
 		}
@@ -692,7 +687,7 @@ func FormatText(r Result) string {
 				g.SessionsCount,
 				formatTime(g.AgentTimeSec),
 				formatTime(g.UserActiveTimeSec),
-				fmt.Sprintf("%s / %s / %s / %s", formatInt(g.InputTokens), formatInt(g.OutputTokens), formatInt(g.CacheReadTokens), formatInt(g.CacheCreationTokens)),
+				formatTokens(g.InputTokens, g.OutputTokens, g.CacheReadTokens, g.CacheCreationTokens),
 				gcost,
 			)
 		}
@@ -725,7 +720,7 @@ func FormatText(r Result) string {
 				formatTime(s.AgentTimeSec),
 				formatTime(s.UserTimeSec),
 				s.WorkItem,
-				fmt.Sprintf("%s / %s / %s / %s", formatInt(s.InputTokens), formatInt(s.OutputTokens), formatInt(s.CacheReadTokens), formatInt(s.CacheCreationTokens)),
+				formatTokens(s.InputTokens, s.OutputTokens, s.CacheReadTokens, s.CacheCreationTokens),
 				scost,
 			)
 		}
@@ -738,6 +733,10 @@ func formatTime(sec int64) string {
 	h := sec / 3600
 	m := (sec % 3600) / 60
 	return fmt.Sprintf("%dh %dm", h, m)
+}
+
+func formatTokens(in, out, read, create int64) string {
+	return fmt.Sprintf("%s / %s / %s / %s", formatInt(in), formatInt(out), formatInt(read), formatInt(create))
 }
 
 func FormatJSON(r Result) string {
