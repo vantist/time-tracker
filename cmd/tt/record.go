@@ -201,23 +201,21 @@ func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJS
 			tool = dbTool
 		}
 
-		if tool == "copilot-cli" {
-			path := filepath.Join("~", ".copilot", "session-state", sessionID, "events.jsonl")
-			res, err := transcript.ParseCopilotLog(path)
-			if err == nil {
-				tokensJSON = marshalWindowResult(res)
-				model = res.Model()
+		if tool == "copilot-cli" || tool == "antigravity" {
+			var res transcript.WindowResult
+			var err error
+			if tool == "copilot-cli" {
+				path := filepath.Join("~", ".copilot", "session-state", sessionID, "events.jsonl")
+				res, err = transcript.ParseCopilotLog(path)
 			} else {
-				fmt.Fprintf(os.Stderr, "tt: failed to parse copilot log: %v\n", err)
+				path := filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+				res, err = transcript.ParseAntigravityLog(path)
 			}
-		} else if tool == "antigravity" {
-			path := filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
-			res, err := transcript.ParseAntigravityLog(path)
 			if err == nil {
 				tokensJSON = marshalWindowResult(res)
 				model = res.Model()
 			} else {
-				fmt.Fprintf(os.Stderr, "tt: failed to parse antigravity log: %v\n", err)
+				fmt.Fprintf(os.Stderr, "tt: failed to parse %s log: %v\n", tool, err)
 			}
 		} else {
 			transcriptPath := ""

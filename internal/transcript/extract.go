@@ -219,14 +219,18 @@ func makeMainUsage(model string, acc usageFields) ModelUsage {
 	}
 }
 
-func loadTranscript(path string) ([]entry, error) {
+func expandHome(path string) string {
 	if len(path) >= 2 && path[:2] == "~/" {
 		home, err := os.UserHomeDir()
 		if err == nil {
-			path = filepath.Join(home, path[2:])
+			return filepath.Join(home, path[2:])
 		}
 	}
-	f, err := os.Open(path)
+	return path
+}
+
+func loadTranscript(path string) ([]entry, error) {
+	f, err := os.Open(expandHome(path))
 	if err != nil {
 		return nil, err
 	}

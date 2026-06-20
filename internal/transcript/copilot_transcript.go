@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"os"
-	"path/filepath"
 )
 
 type copilotUsage struct {
@@ -28,14 +27,7 @@ type copilotEvent struct {
 
 // ParseCopilotLog reads events.jsonl and extracts model metrics from session.shutdown.
 func ParseCopilotLog(path string) (WindowResult, error) {
-	if len(path) >= 2 && path[:2] == "~/" {
-		home, err := os.UserHomeDir()
-		if err == nil {
-			path = filepath.Join(home, path[2:])
-		}
-	}
-
-	f, err := os.Open(path)
+	f, err := os.Open(expandHome(path))
 	if err != nil {
 		return WindowResult{}, err
 	}

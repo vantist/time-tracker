@@ -35,25 +35,16 @@ func TestParseCopilotLog_Normal(t *testing.T) {
 		t.Fatalf("expected 1 usage, got %d", len(res.Usages))
 	}
 
-	u := res.Usages[0]
-	if u.Model != "gpt-5.4" {
-		t.Errorf("expected Model to be gpt-5.4, got %q", u.Model)
+	want := transcript.ModelUsage{
+		Model:               "gpt-5.4",
+		InputTokens:         1000,
+		OutputTokens:        250, // 200 + 50 reasoning
+		CacheReadTokens:     500,
+		CacheCreationTokens: 100,
+		IsSubagent:          false,
 	}
-	if u.InputTokens != 1000 {
-		t.Errorf("expected InputTokens to be 1000, got %d", u.InputTokens)
-	}
-	// OutputTokens should include reasoningTokens: 200 + 50 = 250
-	if u.OutputTokens != 250 {
-		t.Errorf("expected OutputTokens to be 250 (200 + 50 reasoning), got %d", u.OutputTokens)
-	}
-	if u.CacheReadTokens != 500 {
-		t.Errorf("expected CacheReadTokens to be 500, got %d", u.CacheReadTokens)
-	}
-	if u.CacheCreationTokens != 100 {
-		t.Errorf("expected CacheCreationTokens to be 100, got %d", u.CacheCreationTokens)
-	}
-	if u.IsSubagent {
-		t.Errorf("expected IsSubagent to be false")
+	if res.Usages[0] != want {
+		t.Errorf("usage = %+v, want %+v", res.Usages[0], want)
 	}
 }
 

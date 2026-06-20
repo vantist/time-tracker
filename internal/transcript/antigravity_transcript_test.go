@@ -36,30 +36,18 @@ func TestParseAntigravityLog_Normal(t *testing.T) {
 		t.Fatalf("expected 1 usage, got %d", len(res.Usages))
 	}
 
-	u := res.Usages[0]
-	if u.Model != "claude-sonnet-4-6" {
-		t.Errorf("expected Model to be claude-sonnet-4-6, got %q", u.Model)
+	want := transcript.ModelUsage{
+		Model:               "claude-sonnet-4-6",
+		InputTokens:         100,
+		OutputTokens:        50,
+		CacheReadTokens:     10,
+		CacheCreationTokens: 5,
+		CacheCreation5m:     20,
+		CacheCreation1h:     30,
+		IsSubagent:          false,
 	}
-	if u.InputTokens != 100 {
-		t.Errorf("expected InputTokens to be 100, got %d", u.InputTokens)
-	}
-	if u.OutputTokens != 50 {
-		t.Errorf("expected OutputTokens to be 50, got %d", u.OutputTokens)
-	}
-	if u.CacheReadTokens != 10 {
-		t.Errorf("expected CacheReadTokens to be 10, got %d", u.CacheReadTokens)
-	}
-	if u.CacheCreationTokens != 5 {
-		t.Errorf("expected CacheCreationTokens to be 5, got %d", u.CacheCreationTokens)
-	}
-	if u.CacheCreation5m != 20 {
-		t.Errorf("expected CacheCreation5m to be 20, got %d", u.CacheCreation5m)
-	}
-	if u.CacheCreation1h != 30 {
-		t.Errorf("expected CacheCreation1h to be 30, got %d", u.CacheCreation1h)
-	}
-	if u.IsSubagent {
-		t.Errorf("expected IsSubagent to be false")
+	if res.Usages[0] != want {
+		t.Errorf("usage = %+v, want %+v", res.Usages[0], want)
 	}
 }
 
