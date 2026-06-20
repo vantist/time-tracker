@@ -1118,6 +1118,164 @@ func TestReportModelUsages(t *testing.T) {
 	}
 }
 
+func TestFormatTextFourCategoriesAllTables(t *testing.T) {
+	costVal := 0.05
+	r := report.Result{
+		SessionsCount:       3,
+		AgentTimeSec:        int64(2*3600 + 34*60),
+		UserActiveTimeSec:   int64(1*3600 + 10*60),
+		InputTokens:         10000,
+		OutputTokens:        2000,
+		CacheReadTokens:     1000,
+		CacheCreationTokens: 500,
+		EstimatedCostUSD:    ptr(0.042),
+		ModelUsages: []report.ModelUsageSummary{
+			{
+				Model:               "gemini-2.5-flash",
+				IsSubagent:          false,
+				InputTokens:         6000,
+				OutputTokens:        1200,
+				CacheReadTokens:     500,
+				CacheCreationTokens: 300,
+				EstimatedCostUSD:    0.025,
+			},
+		},
+		Daily: []report.DailyStat{
+			{
+				Date:                "2026-06-15",
+				Sessions:            1,
+				InputTokens:         4000,
+				OutputTokens:        800,
+				CacheReadTokens:     200,
+				CacheCreationTokens: 100,
+			},
+		},
+		ByProject: []report.ProjectSummary{
+			{
+				Project:             "alpha",
+				SessionsCount:       2,
+				AgentTimeSec:        3600,
+				UserActiveTimeSec:   1800,
+				CostUSD:             &costVal,
+				InputTokens:         5000,
+				OutputTokens:        1000,
+				CacheReadTokens:     300,
+				CacheCreationTokens: 200,
+			},
+		},
+		ByAgent: []report.AgentSummary{
+			{
+				Agent:               "Claude Code",
+				Sessions:            2,
+				AgentTime:           "1h 0m",
+				UserTime:            "0h 30m",
+				Tokens:              "5,000 / 1,000 / 300 / 200",
+				Cost:                0.03,
+				InputTokens:         5000,
+				OutputTokens:        1000,
+				CacheReadTokens:     300,
+				CacheCreationTokens: 200,
+			},
+		},
+		Groups: []report.GroupResult{
+			{
+				Label:               "feat-a",
+				Project:             "alpha",
+				SessionsCount:       1,
+				AgentTimeSec:        2000,
+				UserActiveTimeSec:   1000,
+				EstimatedCostUSD:    &costVal,
+				InputTokens:         5000,
+				OutputTokens:        1000,
+				CacheReadTokens:     300,
+				CacheCreationTokens: 200,
+			},
+		},
+		Sessions: []report.SessionRow{
+			{
+				ID:                  "s1",
+				Project:             "/path/to/alpha",
+				Branch:              "main",
+				Model:               "gemini-2.5-flash",
+				StartedAt:           "2026-06-19T10:00:00Z",
+				WorkItem:            "feat-a",
+				Turns:               5,
+				AgentTimeSec:        1200,
+				UserTimeSec:         600,
+				CostUSD:             &costVal,
+				InputTokens:         5000,
+				OutputTokens:        1000,
+				CacheReadTokens:     300,
+				CacheCreationTokens: 200,
+			},
+		},
+		ByWorkItem: true,
+	}
+
+	text := report.FormatText(r)
+
+	// 1. Check By Model & Role table (has cache token columns and correct values)
+	for _, want := range []string{
+		"Model", "Role", "Input", "Output", "Cache Rd", "Cache Cr", "Cost",
+		"gemini-2.5-flash", "Main", "6,000", "1,200", "500", "300", "$0.0250",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing Model & Role detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// 2. Check Daily timeline (has Cache Rd, Cache Cr columns and values)
+	for _, want := range []string{
+		"Date", "Sessions", "Input", "Output", "Cache Rd", "Cache Cr",
+		"2026-06-15", "1", "4,000", "800", "200", "100",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing Daily detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// 3. Check By Project table (Tokens format is input / output / cache read / cache create)
+	for _, want := range []string{
+		"Project", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"alpha", "2", "1h 0m", "0h 30m", "5,000 / 1,000 / 300 / 200", "$0.0500",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing By Project detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// 4. Check By Agent table (Tokens format is input / output / cache read / cache create)
+	for _, want := range []string{
+		"Agent", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"Claude Code", "2", "1h 0m", "0h 30m", "5,000 / 1,000 / 300 / 200", "$0.0300",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing By Agent detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// 5. Check By Work Item table (Tokens column present, format input / output / cache read / cache create)
+	for _, want := range []string{
+		"Work Item", "Project", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"feat-a", "alpha", "1", "0h 33m", "0h 16m", "5,000 / 1,000 / 300 / 200", "$0.0500",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing By Work Item detail %q in output:\n%s", want, text)
+		}
+	}
+
+	// 6. Check Sessions table (Tokens column present, format input / output / cache read / cache create)
+	for _, want := range []string{
+		"Start Time", "Project", "Branch", "Agent", "Model", "Turns", "Agent Time", "User Time", "Work Item", "Tokens", "Cost",
+		"alpha", "main", "Claude Code", "gemini-2.5-flash", "5", "0h 20m", "0h 10m", "feat-a", "5,000 / 1,000 / 300 / 200", "$0.0500",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("FormatText: missing Sessions detail %q in output:\n%s", want, text)
+		}
+	}
+}
+
+
 func TestQueryAllDimensionsDetailedTokens(t *testing.T) {
 	conn := openTestDB(t)
 	now := time.Now().UTC()
