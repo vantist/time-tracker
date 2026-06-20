@@ -1,5 +1,17 @@
 # Spex Insights
 
+## 2026-06-21 — antigravity-session-fix [spex-apply]
+
+**Promote candidates:**
+
+- [ ] Database transaction updates on related tables
+  > **Why**: When reconciling turn-level events, updating session-level metadata (such as backfilling sessions.model) inside the same database transaction tx ensures atomic updates, avoids race conditions, and maintains data consistency.
+  > **How to apply**: Whenever reconciling or updating records in a table where related parent/child tables share fields that should align, bundle all updates within a single tx.Begin() / tx.Commit() block.
+
+**Plan deviations:** none
+
+---
+
 ## 2026-06-21 — antigravity-turns-fix [spex-apply]
 
 **Promote candidates:**
