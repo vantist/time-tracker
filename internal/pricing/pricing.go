@@ -8,6 +8,7 @@ import (
 )
 
 var dateSuffix = regexp.MustCompile(`-\d{8}$`)
+var versionSuffix = regexp.MustCompile(`-(latest|preview|exp|\d{3})$`)
 
 type modelPricing struct {
 	input         float64
@@ -34,7 +35,9 @@ func normalize(model string) string {
 	if i := strings.LastIndex(model, "/"); i >= 0 {
 		model = model[i+1:]
 	}
-	return dateSuffix.ReplaceAllString(model, "")
+	model = dateSuffix.ReplaceAllString(model, "")
+	model = versionSuffix.ReplaceAllString(model, "")
+	return model
 }
 
 // Calculate returns estimated cost in USD, or nil for unknown models.
