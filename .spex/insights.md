@@ -207,4 +207,17 @@
 
 ---
 
+## 2026-06-20 — setup-expansion [spex-apply]
 
+**Promote candidates:**
+- [ ] Resetting CLI flags in Cobra integration tests
+  > **Why**: When running multiple Cobra tests in the same process, CLI flag values can persist across test executions because the global command variables are reused. If not explicitly reset, flags set in one test can bleed into subsequent tests.
+  > **How to apply**: When writing Cobra integration tests, always explicitly reset all command flags by calling `cmd.Flags().Set("flag-name", "default-value")` at the beginning of each test case.
+
+- [ ] Re-assign derived home-relative paths when changing `HOME` env var in tests
+  > **Why**: Re-setting the `HOME` environment variable via `t.Setenv` mid-test is effective, but any path variable derived before that re-set (e.g. `configPath`) will still point to the old directory, causing tests to write to the wrong temp folder.
+  > **How to apply**: Always re-calculate home-relative paths (like `filepath.Join(home, ...)`) immediately after re-setting `HOME` or updating a `home` directory mock variable.
+
+**Plan deviations:** none
+
+---
