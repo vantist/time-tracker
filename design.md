@@ -85,6 +85,62 @@ stdin takes precedence when available (non-empty stdin detected via `os.Stdin.St
 ```
 `--tool` flag needed so recorder can set the correct tool name (stdin won't provide it).
 
+## Google Antigravity Hook Integration
+
+### Stdin fields
+- `conversationId`: Mapped to `SessionID`
+- `transcriptPath`: Mapped to `TranscriptPath`
+
+### Hook settings format (`~/.gemini/config/hooks.json`)
+```json
+{
+  "tt": {
+    "PreInvocation": [
+      {
+        "_owner": "tt",
+        "type": "command",
+        "command": "tt record prompt --tool antigravity"
+      }
+    ],
+    "Stop": [
+      {
+        "_owner": "tt",
+        "type": "command",
+        "command": "tt record response --tool antigravity"
+      }
+    ]
+  }
+}
+```
+
+## OpenAI Codex Hook Integration
+
+### Stdin fields
+- Standard stdin JSON format (e.g. `session_id`, `transcript_path`).
+
+### Hook settings format (`~/.codex/hooks.json`)
+```json
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "_owner": "tt",
+        "type": "command",
+        "command": "tt record prompt --tool codex"
+      }
+    ],
+    "Stop": [
+      {
+        "_owner": "tt",
+        "type": "command",
+        "command": "tt record response --tool codex"
+      }
+    ]
+  }
+}
+```
+
+
 ## Open Questions
 
 - [x] Stop hook token fields — test empirically whether Claude Code Stop stdin includes usage data.
