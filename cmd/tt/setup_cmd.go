@@ -24,12 +24,23 @@ var setupCmd = &cobra.Command{
 		antigravity, _ := cmd.Flags().GetBool("antigravity")
 		codex, _ := cmd.Flags().GetBool("codex")
 
+		anyFlagSet := claudeCode || copilot || antigravity || codex
+
+		if !anyFlagSet {
+			claudeCode = setup.IsClaudeCodeActive()
+			copilot = setup.IsCopilotActive()
+			antigravity = setup.IsAntigravityActive()
+			codex = setup.IsCodexActive()
+		}
+
+		configuredAny := false
+
 		if claudeCode {
 			if err := setup.SetupClaudeCode(); err != nil {
 				return err
 			}
 			fmt.Println("Claude Code hooks configured in ~/.claude/settings.json")
-			return nil
+			configuredAny = true
 		}
 
 		if copilot {
@@ -37,7 +48,7 @@ var setupCmd = &cobra.Command{
 				return err
 			}
 			fmt.Println("GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json")
-			return nil
+			configuredAny = true
 		}
 
 		if antigravity {
@@ -45,7 +56,7 @@ var setupCmd = &cobra.Command{
 				return err
 			}
 			fmt.Println("Google Antigravity hooks configured in ~/.gemini/config/hooks.json")
-			return nil
+			configuredAny = true
 		}
 
 		if codex {
@@ -53,9 +64,13 @@ var setupCmd = &cobra.Command{
 				return err
 			}
 			fmt.Println("OpenAI Codex hooks configured in ~/.codex/hooks.json")
-			return nil
+			configuredAny = true
 		}
 
-		return cmd.Help()
+		if !anyFlagSet && !configuredAny {
+			fmt.Println("No supported AI tools detected...")
+		}
+
+		return nil
 	},
 }
