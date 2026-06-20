@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"path/filepath"
 	"sync"
 )
 
@@ -30,4 +31,57 @@ func GetProvider(tool string) (LogProvider, bool) {
 	defer providersMu.RUnlock()
 	p, ok := providers[tool]
 	return p, ok
+}
+
+// JSONLProvider is a shared base for JSONL log formats.
+type JSONLProvider struct {
+	SupportsSub bool
+}
+
+func (j *JSONLProvider) ExtractWindow(path string, fromOffset int, toOffset int) (WindowResult, error) {
+	return ExtractWindow(path, fromOffset, toOffset)
+}
+
+func (j *JSONLProvider) ExtractLastTurn(path string) (WindowResult, error) {
+	return ExtractLastTurn(path)
+}
+
+func (j *JSONLProvider) SupportsSubagents() bool {
+	return j.SupportsSub
+}
+
+// ClaudeProvider handles Claude Code log format.
+type ClaudeProvider struct {
+	JSONLProvider
+}
+
+func (p *ClaudeProvider) ResolvePath(sessionID string, stdinPath string) string {
+	return stdinPath
+}
+
+// AntigravityProvider handles Google Antigravity log format.
+type AntigravityProvider struct {
+	JSONLProvider
+}
+
+func (p *AntigravityProvider) ResolvePath(sessionID string, stdinPath string) string {
+	if stdinPath != "" {
+		return stdinPath
+	}
+	return filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+}
+
+// CodexProvider handles OpenAI Codex log format.
+type CodexProvider struct {
+	JSONLProvider
+}
+
+func (p *CodexProvider) ResolvePath(sessionID string, stdinPath string) string {
+	return stdinPath
+}
+
+func init() {
+	Register("claude-code", &ClaudeProvider{JSONLProvider{SupportsSub: true}})
+	Register("antigravity", &AntigravityProvider{JSONLProvider{SupportsSub: true}})
+	Register("codex", &CodexProvider{JSONLProvider{SupportsSub: false}})
 }

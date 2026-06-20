@@ -1,6 +1,8 @@
 package transcript
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -37,5 +39,56 @@ func TestRegistry(t *testing.T) {
 	_, ok = GetProvider("non-existent")
 	if ok {
 		t.Error("expected non-existent to not be registered")
+	}
+}
+
+func TestJSONLProvider(t *testing.T) {
+	dir := t.TempDir()
+
+	// Write main transcript
+	mainLines := []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":5},"content":[{"type":"tool_use","id":"toolu_sub1","name":"Agent"}]}}`,
+	}
+	path := filepath.Join(dir, "transcript.jsonl")
+	f, _ := os.Create(path)
+	for _, l := range mainLines {
+		f.WriteString(l + "\n")
+	}
+	f.Close()
+
+	// Setup subagent
+	subDir := filepath.Join(dir, "transcript", "subagents")
+	os.MkdirAll(subDir, 0755)
+	os.WriteFile(filepath.Join(subDir, "agent-aaa.meta.json"),
+		[]byte(`{"toolUseId":"toolu_sub1"}`), 0644)
+	subLines := `{"type":"assistant","isSidechain":true,"message":{"model":"claude-haiku-4-5","usage":{"input_tokens":100,"output_tokens":50}}}` + "\n"
+	os.WriteFile(filepath.Join(subDir, "agent-aaa.jsonl"), []byte(subLines), 0644)
+
+	// Test ExtractWindow via JSONLProvider
+	jp := &JSONLProvider{SupportsSub: true}
+	res, err := jp.ExtractWindow(path, 0, -1)
+	if err != nil {
+		t.Fatalf("ExtractWindow: %v", err)
+	}
+	if res.InputTokens() != 110 {
+		t.Errorf("InputTokens = %d, want 110", res.InputTokens())
+	}
+	if res.OutputTokens() != 55 {
+		t.Errorf("OutputTokens = %d, want 55", res.OutputTokens())
+	}
+
+	// Test ExtractLastTurn via JSONLProvider
+	resLT, err := jp.ExtractLastTurn(path)
+	if err != nil {
+		t.Fatalf("ExtractLastTurn: %v", err)
+	}
+	if resLT.InputTokens() != 110 {
+		t.Errorf("ExtractLastTurn InputTokens = %d, want 110", resLT.InputTokens())
+	}
+
+	// Test SupportsSubagents
+	if !jp.SupportsSubagents() {
+		t.Error("expected SupportsSubagents to be true")
 	}
 }
