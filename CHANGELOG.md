@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.8.0](https://github.com/vantist/time-tracker/compare/v1.7.0...v1.8.0) (2026-06-20)
+
+
+### Features
+
+* **pricing:** add pricing and tests for gpt-5.4 and gpt-5-mini ([e5f930e](https://github.com/vantist/time-tracker/commit/e5f930e1a823c5699a3cb60d0884a8ad956bcc22))
+* **record:** integrate copilot-cli and antigravity log parsers with response hook ([7e54cb2](https://github.com/vantist/time-tracker/commit/7e54cb2affaa61d18c67f899509a949390b528f9))
+* **transcript:** add antigravity transcript.jsonl parser and tests ([875e571](https://github.com/vantist/time-tracker/commit/875e571cb8a94ce819b4ed77fd7e78fcf656f96d))
+* **transcript:** add copilot events.jsonl parser and tests ([a238087](https://github.com/vantist/time-tracker/commit/a238087620c6b82ab1cc012a928749a68d239d77))
+
 ## [1.7.0](https://github.com/vantist/time-tracker/compare/v1.6.0...v1.7.0) (2026-06-19)
 
 
