@@ -719,48 +719,58 @@ func TestFormatTextFull(t *testing.T) {
 	costVal := 0.05
 	costVal2 := 0.0
 	r := report.Result{
-		SessionsCount:     3,
-		AgentTimeSec:      int64(2*3600 + 34*60),
-		UserActiveTimeSec: int64(1*3600 + 10*60),
-		InputTokens:       10000,
-		OutputTokens:      2000,
-		EstimatedCostUSD:  ptr(0.042),
+		SessionsCount:       3,
+		AgentTimeSec:        int64(2*3600 + 34*60),
+		UserActiveTimeSec:   int64(1*3600 + 10*60),
+		InputTokens:         10000,
+		OutputTokens:        2000,
+		CacheReadTokens:     0,
+		CacheCreationTokens: 0,
+		EstimatedCostUSD:    ptr(0.042),
 		Daily: []report.DailyStat{
-			{Date: "2026-06-15", Sessions: 1, InputTokens: 4000, OutputTokens: 800},
-			{Date: "2026-06-16", Sessions: 2, InputTokens: 6000, OutputTokens: 1200},
+			{Date: "2026-06-15", Sessions: 1, InputTokens: 4000, OutputTokens: 800, CacheReadTokens: 0, CacheCreationTokens: 0},
+			{Date: "2026-06-16", Sessions: 2, InputTokens: 6000, OutputTokens: 1200, CacheReadTokens: 0, CacheCreationTokens: 0},
 		},
 		ByProject: []report.ProjectSummary{
-			{Project: "alpha", SessionsCount: 2, AgentTimeSec: 3600, UserActiveTimeSec: 1800, CostUSD: &costVal, InputTokens: 5000, OutputTokens: 1000},
-			{Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, CostUSD: nil, InputTokens: 5000, OutputTokens: 1000},
+			{Project: "alpha", SessionsCount: 2, AgentTimeSec: 3600, UserActiveTimeSec: 1800, CostUSD: &costVal, InputTokens: 5000, OutputTokens: 1000, CacheReadTokens: 0, CacheCreationTokens: 0},
+			{Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, CostUSD: nil, InputTokens: 5000, OutputTokens: 1000, CacheReadTokens: 0, CacheCreationTokens: 0},
 		},
 		Groups: []report.GroupResult{
-			{Label: "feat-a", Project: "alpha", SessionsCount: 1, AgentTimeSec: 2000, UserActiveTimeSec: 1000, EstimatedCostUSD: &costVal},
-			{Label: "feat-b", Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, EstimatedCostUSD: nil},
+			{Label: "feat-a", Project: "alpha", SessionsCount: 1, AgentTimeSec: 2000, UserActiveTimeSec: 1000, EstimatedCostUSD: &costVal, InputTokens: 0, OutputTokens: 0, CacheReadTokens: 0, CacheCreationTokens: 0},
+			{Label: "feat-b", Project: "beta", SessionsCount: 1, AgentTimeSec: 1200, UserActiveTimeSec: 600, EstimatedCostUSD: nil, InputTokens: 0, OutputTokens: 0, CacheReadTokens: 0, CacheCreationTokens: 0},
 		},
 		Sessions: []report.SessionRow{
 			{
-				ID:           "s1",
-				Project:      "/path/to/alpha",
-				Branch:       "main",
-				Model:        "gemini-2.5-flash",
-				StartedAt:    "2026-06-19T10:00:00Z",
-				WorkItem:     "feat-a",
-				Turns:        5,
-				AgentTimeSec: 1200,
-				UserTimeSec:  600,
-				CostUSD:      &costVal,
+				ID:                  "s1",
+				Project:             "/path/to/alpha",
+				Branch:              "main",
+				Model:               "gemini-2.5-flash",
+				StartedAt:           "2026-06-19T10:00:00Z",
+				WorkItem:            "feat-a",
+				Turns:               5,
+				AgentTimeSec:        1200,
+				UserTimeSec:         600,
+				CostUSD:             &costVal,
+				InputTokens:         0,
+				OutputTokens:        0,
+				CacheReadTokens:     0,
+				CacheCreationTokens: 0,
 			},
 			{
-				ID:           "s2",
-				Project:      "/path/to/beta",
-				Branch:       "dev",
-				Model:        "gemini-2.5-pro",
-				StartedAt:    "2026-06-19T09:00:00Z",
-				WorkItem:     "feat-b",
-				Turns:        2,
-				AgentTimeSec: 600,
-				UserTimeSec:  300,
-				CostUSD:      &costVal2,
+				ID:                  "s2",
+				Project:             "/path/to/beta",
+				Branch:              "dev",
+				Model:               "gemini-2.5-pro",
+				StartedAt:           "2026-06-19T09:00:00Z",
+				WorkItem:            "feat-b",
+				Turns:               2,
+				AgentTimeSec:        600,
+				UserTimeSec:         300,
+				CostUSD:             &costVal2,
+				InputTokens:         0,
+				OutputTokens:        0,
+				CacheReadTokens:     0,
+				CacheCreationTokens: 0,
 			},
 		},
 	}
@@ -770,7 +780,7 @@ func TestFormatTextFull(t *testing.T) {
 	// Verify Daily timeline headers and content
 	for _, want := range []string{
 		"─── Daily (Last 7 Days) ───",
-		"Date", "Sessions", "Input Tokens", "Output Tokens",
+		"Date", "Sessions", "Input", "Output", "Cache Rd", "Cache Cr",
 		"2026-06-15", "4,000", "800",
 		"2026-06-16", "6,000", "1,200",
 	} {
@@ -782,9 +792,9 @@ func TestFormatTextFull(t *testing.T) {
 	// Verify By Project headers and content
 	for _, want := range []string{
 		"─── By Project ───",
-		"Project", "Sessions", "Agent Time", "User Active", "Tokens (I/O)", "Cost",
-		"alpha", "2", "1h 0m", "0h 30m", "5,000 / 1,000", "$0.0500",
-		"beta", "1", "0h 20m", "0h 10m", "5,000 / 1,000", "N/A",
+		"Project", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"alpha", "2", "1h 0m", "0h 30m", "5,000 / 1,000 / 0 / 0", "$0.0500",
+		"beta", "1", "0h 20m", "0h 10m", "5,000 / 1,000 / 0 / 0", "N/A",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("FormatText missing project detail %q in output:\n%s", want, text)
@@ -794,9 +804,9 @@ func TestFormatTextFull(t *testing.T) {
 	// Verify By Work Item headers and content
 	for _, want := range []string{
 		"─── By Work Item ───",
-		"Work Item", "Project", "Sessions", "Agent Time", "User Active", "Cost",
-		"feat-a", "alpha", "1", "0h 33m", "0h 16m", "$0.0500",
-		"feat-b", "beta", "1", "0h 20m", "0h 10m", "N/A",
+		"Work Item", "Project", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"feat-a", "alpha", "1", "0h 33m", "0h 16m", "0 / 0 / 0 / 0", "$0.0500",
+		"feat-b", "beta", "1", "0h 20m", "0h 10m", "0 / 0 / 0 / 0", "N/A",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("FormatText missing work item detail %q in output:\n%s", want, text)
@@ -806,9 +816,9 @@ func TestFormatTextFull(t *testing.T) {
 	// Verify Sessions log headers and content
 	for _, want := range []string{
 		"─── Sessions ───",
-		"Start Time", "Project", "Branch", "Model", "Turns", "Agent Time", "User Time", "Work Item", "Cost",
+		"Start Time", "Project", "Branch", "Agent", "Model", "Turns", "Agent Time", "User Time", "Work Item", "Tokens", "Cost",
 		"alpha", "beta", "main", "dev", "gemini-2.5-flash", "gemini-2.5-pro",
-		"5", "2", "0h 20m", "0h 10m", "0h 5m", "feat-a", "feat-b", "$0.0500", "$0.0000",
+		"5", "2", "0h 20m", "0h 10m", "0h 5m", "feat-a", "feat-b", "0 / 0 / 0 / 0", "$0.0500", "$0.0000",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("FormatText missing session detail %q in output:\n%s", want, text)
@@ -991,26 +1001,34 @@ func TestFormatTextAgentAttribution(t *testing.T) {
 		EstimatedCostUSD:  &costVal,
 		ByAgent: []report.AgentSummary{
 			{
-				Agent:     "Claude Code",
-				Sessions:  1,
-				AgentTime: "0h 10m",
-				UserTime:  "0h 5m",
-				Tokens:    "1,000 / 500",
-				Cost:      0.04,
+				Agent:               "Claude Code",
+				Sessions:            1,
+				AgentTime:           "0h 10m",
+				UserTime:            "0h 5m",
+				Tokens:              "1,000 / 500 / 0 / 0",
+				Cost:                0.04,
+				InputTokens:         1000,
+				OutputTokens:        500,
+				CacheReadTokens:     0,
+				CacheCreationTokens: 0,
 			},
 		},
 		Sessions: []report.SessionRow{
 			{
-				ID:           "s1",
-				Project:      "/path/to/myproj",
-				Branch:       "main",
-				Tool:         "Claude Code",
-				Model:        "gemini-2.5-flash",
-				Turns:        3,
-				AgentTimeSec: 600,
-				UserTimeSec:  300,
-				CostUSD:      &costVal,
-				StartedAt:    "2026-06-19T10:00:00Z",
+				ID:                  "s1",
+				Project:             "/path/to/myproj",
+				Branch:              "main",
+				Tool:                "Claude Code",
+				Model:               "gemini-2.5-flash",
+				Turns:               3,
+				AgentTimeSec:        600,
+				UserTimeSec:         300,
+				CostUSD:             &costVal,
+				StartedAt:           "2026-06-19T10:00:00Z",
+				InputTokens:         0,
+				OutputTokens:        0,
+				CacheReadTokens:     0,
+				CacheCreationTokens: 0,
 			},
 		},
 	}
@@ -1020,8 +1038,8 @@ func TestFormatTextAgentAttribution(t *testing.T) {
 	// Verify By Agent block header and row
 	for _, want := range []string{
 		"─── By Agent ───",
-		"Agent", "Sessions", "Agent Time", "User Active", "Tokens (I/O)", "Cost",
-		"Claude Code", "0h 10m", "0h 5m", "1,000 / 500", "$0.0400",
+		"Agent", "Sessions", "Agent Time", "User Active", "Tokens", "Cost",
+		"Claude Code", "0h 10m", "0h 5m", "1,000 / 500 / 0 / 0", "$0.0400",
 	} {
 		if !strings.Contains(text, want) {
 			t.Errorf("FormatText ByAgent output missing %q, got:\n%s", want, text)
