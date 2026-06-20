@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/vantist/time-tracker/compare/v1.8.0...v1.9.0) (2026-06-20)
+
+
+### Features
+
+* **pricing:** expand pricing table with 2026 models and custom pricing ([02fd0c3](https://github.com/vantist/time-tracker/commit/02fd0c30da1933efee45e2c5786b09387022e1c2))
+* **pricing:** implement version and preview suffix normalization ([30e4497](https://github.com/vantist/time-tracker/commit/30e4497a0133c2a6c1d56ba7744526a296ab6714))
+
 ## [1.8.0](https://github.com/vantist/time-tracker/compare/v1.7.0...v1.8.0) (2026-06-20)
 
 
