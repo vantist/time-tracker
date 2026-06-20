@@ -1,6 +1,7 @@
 package transcript
 
 import (
+	"os"
 	"path/filepath"
 	"sync"
 )
@@ -67,6 +68,10 @@ type AntigravityProvider struct {
 func (p *AntigravityProvider) ResolvePath(sessionID string, stdinPath string) string {
 	if stdinPath != "" {
 		return stdinPath
+	}
+	cliPath := filepath.Join("~", ".gemini", "antigravity-cli", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+	if _, err := os.Stat(expandHome(cliPath)); err == nil {
+		return cliPath
 	}
 	return filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
 }

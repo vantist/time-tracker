@@ -92,3 +92,52 @@ func TestJSONLProvider(t *testing.T) {
 		t.Error("expected SupportsSubagents to be true")
 	}
 }
+
+func TestAntigravityProvider_ResolvePath(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("HOME", tmpDir)
+
+	sessionID := "sess-xyz"
+	ap := &AntigravityProvider{}
+
+	cliPath := filepath.Join(tmpDir, ".gemini", "antigravity-cli", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+	legacyPath := filepath.Join(tmpDir, ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+
+	// 1. Neither exists -> should fallback to legacy path
+	got := ap.ResolvePath(sessionID, "")
+	wantLegacy := filepath.Join("~", ".gemini", "antigravity", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+	if got != wantLegacy {
+		t.Errorf("ResolvePath empty state = %q, want %q", got, wantLegacy)
+	}
+
+	// 2. Legacy path exists -> should return legacy path
+	if err := os.MkdirAll(filepath.Dir(legacyPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(legacyPath, []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got = ap.ResolvePath(sessionID, "")
+	if got != wantLegacy {
+		t.Errorf("ResolvePath legacy exists = %q, want %q", got, wantLegacy)
+	}
+
+	// 3. CLI path exists -> should return CLI path
+	if err := os.MkdirAll(filepath.Dir(cliPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cliPath, []byte(""), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	got = ap.ResolvePath(sessionID, "")
+	wantCli := filepath.Join("~", ".gemini", "antigravity-cli", "brain", sessionID, ".system_generated", "logs", "transcript.jsonl")
+	if got != wantCli {
+		t.Errorf("ResolvePath cli exists = %q, want %q", got, wantCli)
+	}
+
+	// 4. Stdin path is provided -> should return stdin path directly
+	got = ap.ResolvePath(sessionID, "/custom/path.jsonl")
+	if got != "/custom/path.jsonl" {
+		t.Errorf("ResolvePath with stdinPath = %q, want /custom/path.jsonl", got)
+	}
+}
