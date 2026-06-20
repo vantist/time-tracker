@@ -13,4 +13,4 @@
 
 ## 3. Provider 路徑探測邏輯實作
 
-- [ ] 3.1 在 `internal/transcript/provider.go` 中修改 `AntigravityProvider.ResolvePath`，優先尋找 `~/.gemini/antigravity-cli/brain/...` 路徑，若不存在則 fallback 至舊的 `~/.gemini/antigravity/brain/...`
+- [x] 3.1 在 `internal/transcript/provider.go` 中修改 `AntigravityProvider.ResolvePath`，優先尋找 `~/.gemini/antigravity-cli/brain/...` 路徑，若不存在則 fallback 至舊的 `~/.gemini/antigravity/brain/...`
