@@ -221,3 +221,16 @@
 **Plan deviations:** none
 
 ---
+
+## 2026-06-20 — copilot-setup [spex-apply]
+
+**Promote candidates:**
+
+- [ ] Consolidate hook-merging filtering and appending loops into a shared helper `mergeHookEntries`
+  > **Why**: Setting up different AI tools (Claude, Antigravity, Codex, Copilot) involves the same pattern: filtering out existing entries belonging to `_owner == "tt"` and appending new entries to the remaining list. Keeping this logic separate leads to boilerplate code and potential inconsistencies.
+  > **How to apply**: When implementing hook setups for new AI tools, pass the existing entries slice and new entries slice to `mergeHookEntries` to safely filter and merge.
+
+**Plan deviations:** none
+
+---
+
