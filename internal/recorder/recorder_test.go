@@ -71,18 +71,35 @@ func TestRecordPrompt_StableSession(t *testing.T) {
 		ProcessPID:   99001,
 		ProcessStart: 1700000000,
 		Project:      "/home/user/myproject",
-		Tool:         "claude-code",
-		Model:        "claude-sonnet-4-6",
+		Tool:         "antigravity",
+		Model:        "gemini-3.5-flash",
 	}
 
+	// 1. First prompt
 	if err := recorder.RecordPrompt(conn, base); err != nil {
 		t.Fatalf("first RecordPrompt: %v", err)
 	}
 
-	// Simulate /clear: new SessionID, same process key
-	base.SessionID = "conv-b"
+	// 2. Second prompt (should be deduplicated because response_at is NULL)
 	if err := recorder.RecordPrompt(conn, base); err != nil {
 		t.Fatalf("second RecordPrompt: %v", err)
+	}
+
+	// 3. Close the active turn
+	_, err := conn.Exec("UPDATE turns SET response_at = ? WHERE session_id = 'conv-a'", time.Now().UTC().Format(time.RFC3339))
+	if err != nil {
+		t.Fatalf("close first turn: %v", err)
+	}
+
+	// 4. Simulate /clear: new SessionID, same process key
+	base.SessionID = "conv-b"
+	if err := recorder.RecordPrompt(conn, base); err != nil {
+		t.Fatalf("RecordPrompt after clear: %v", err)
+	}
+
+	// 5. Duplicate prompt after clear (should be deduplicated)
+	if err := recorder.RecordPrompt(conn, base); err != nil {
+		t.Fatalf("duplicate RecordPrompt after clear: %v", err)
 	}
 
 	// Expect exactly 1 session with this process key
@@ -92,11 +109,11 @@ func TestRecordPrompt_StableSession(t *testing.T) {
 		t.Errorf("expected 1 session, got %d", sessCount)
 	}
 
-	// Both turns use the stable session ID ("conv-a" — the id of the first-inserted row).
+	// Expect exactly 2 turns under stable session ID ("conv-a")
 	var turnCount int
 	conn.QueryRow("SELECT COUNT(*) FROM turns WHERE session_id='conv-a'").Scan(&turnCount)
 	if turnCount != 2 {
-		t.Errorf("expected 2 turns under stable session ID, got %d", turnCount)
+		t.Errorf("expected 2 turns, got %d", turnCount)
 	}
 }
 
