@@ -23,8 +23,8 @@ func TestReportCmd_OutputFile(t *testing.T) {
 
 	// Insert test data
 	_, err = conn.Exec(`
-		INSERT INTO sessions (id, project, started_at)
-		VALUES ('sess-output-test', '/home/user/myproject', '2026-06-20T10:00:00Z')
+		INSERT INTO sessions (id, project, branch, started_at)
+		VALUES ('sess-output-test', '/home/user/myproject', 'main', '2026-06-20T10:00:00Z')
 	`)
 	if err != nil {
 		t.Fatalf("failed to insert session: %v", err)
