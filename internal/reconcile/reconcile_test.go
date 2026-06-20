@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
@@ -775,5 +776,53 @@ func TestReconcile_DanglingTurnTimeout(t *testing.T) {
 		}
 	})
 }
+
+func TestGitBranch(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	// Non-git directory should return ""
+	if got := gitBranch(tmpDir); got != "" {
+		t.Errorf("gitBranch(%q) = %q, want %q", tmpDir, got, "")
+	}
+
+	// Initialize git repo
+	cmd := exec.Command("git", "init")
+	cmd.Dir = tmpDir
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to init git: %v", err)
+	}
+
+	for _, args := range [][]string{
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "Test User"},
+		{"checkout", "-b", "test-branch"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = tmpDir
+		_ = c.Run()
+	}
+
+	dummyFile := filepath.Join(tmpDir, "dummy")
+	if err := os.WriteFile(dummyFile, []byte("dummy"), 0644); err != nil {
+		t.Fatalf("write dummy file: %v", err)
+	}
+
+	for _, args := range [][]string{
+		{"add", "dummy"},
+		{"commit", "-m", "initial commit"},
+	} {
+		c := exec.Command("git", args...)
+		c.Dir = tmpDir
+		if err := c.Run(); err != nil {
+			t.Fatalf("git %v failed: %v", args, err)
+		}
+	}
+
+	got := gitBranch(tmpDir)
+	if got != "test-branch" {
+		t.Errorf("gitBranch(%q) = %q, want %q", tmpDir, got, "test-branch")
+	}
+}
+
 
 
