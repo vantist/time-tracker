@@ -262,4 +262,20 @@
 
 ---
 
+## 2026-06-21 — detailed-token-cost-categories-breakdown [spex-apply]
+
+**Promote candidates:**
+- [ ] Centralize token category string formatting using a shared helper `formatTokens`
+  > **Why**: Tables and row logs in reports all format tokens using the same `input / output / cache read / cache create` pattern. Extracting this to a single helper function avoids duplicate string building logic and ensures consistency.
+  > **How to apply**: Use `formatTokens(in, out, read, create)` whenever displaying multi-category token details in text reports or logs.
+
+- [ ] Write exported files with secure `0o600` file permissions
+  > **Why**: Report outputs may contain proprietary project structures, agent work times, or cost/pricing data. Restricting write permissions using `0o600` prevents other local users on shared environments from accessing these reports.
+  > **How to apply**: When implementing any report export or dump command that writes to a user-specified path, use `os.WriteFile(path, data, 0600)`.
+
+**Plan deviations:** none
+
+---
+
+
 
