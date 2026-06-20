@@ -261,8 +261,8 @@ func reconcileTurn(conn *sql.DB, dt danglingTurn) error {
 
 func repairSessions(db *sql.DB) {
 	rows, err := db.Query(`
-		SELECT id, COALESCE(tool, ''), COALESCE(model, ''), COALESCE(project, '') FROM sessions
-		WHERE project IS NULL OR project = '' OR model IS NULL OR model = ''
+		SELECT id, COALESCE(tool, ''), COALESCE(model, ''), COALESCE(project, ''), COALESCE(branch, '') FROM sessions
+		WHERE project IS NULL OR project = '' OR model IS NULL OR model = '' OR branch IS NULL OR branch = ''
 	`)
 	if err != nil {
 		return
@@ -274,11 +274,12 @@ func repairSessions(db *sql.DB) {
 		tool    string
 		model   string
 		project string
+		branch  string
 	}
 	var sessList []sessInfo
 	for rows.Next() {
 		var s sessInfo
-		if err := rows.Scan(&s.id, &s.tool, &s.model, &s.project); err == nil {
+		if err := rows.Scan(&s.id, &s.tool, &s.model, &s.project, &s.branch); err == nil {
 			sessList = append(sessList, s)
 		}
 	}
@@ -292,33 +293,46 @@ func repairSessions(db *sql.DB) {
 		id      string
 		project string
 		model   string
+		branch  string
 	}
 	var updates []updateInfo
 
 	for _, s := range sessList {
-		pathToRead, found := findExistingTranscriptPath(db, s.id)
-		if !found {
-			continue
-		}
-
 		newProject := s.project
 		newModel := s.model
+		newBranch := s.branch
 
-		if s.project == "" {
-			if homeDir, err := os.UserHomeDir(); err == nil {
-				newProject = resolveProjectPath(pathToRead, homeDir)
+		if s.project == "" || s.model == "" {
+			pathToRead, found := findExistingTranscriptPath(db, s.id)
+			if found {
+				if s.project == "" {
+					if homeDir, err := os.UserHomeDir(); err == nil {
+						newProject = resolveProjectPath(pathToRead, homeDir)
+					}
+				}
+				if s.model == "" {
+					newModel = resolveModel(pathToRead, s.tool)
+				}
 			}
 		}
 
-		if s.model == "" {
-			newModel = resolveModel(pathToRead, s.tool)
+		if s.branch == "" {
+			if newProject != "" {
+				b := gitBranch(newProject)
+				if b != "" {
+					newBranch = b
+				} else {
+					newBranch = "-"
+				}
+			}
 		}
 
-		if newProject != s.project || newModel != s.model {
+		if newProject != s.project || newModel != s.model || newBranch != s.branch {
 			updates = append(updates, updateInfo{
 				id:      s.id,
 				project: newProject,
 				model:   newModel,
+				branch:  newBranch,
 			})
 		}
 	}
@@ -336,9 +350,9 @@ func repairSessions(db *sql.DB) {
 	for _, up := range updates {
 		_, err = tx.Exec(`
 			UPDATE sessions
-			SET project = ?, model = ?
+			SET project = ?, model = ?, branch = ?
 			WHERE id = ?
-		`, up.project, up.model, up.id)
+		`, up.project, up.model, up.branch, up.id)
 		if err != nil {
 			return
 		}

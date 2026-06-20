@@ -824,5 +824,93 @@ func TestGitBranch(t *testing.T) {
 	}
 }
 
+func TestRepairSessions_Branch(t *testing.T) {
+	db := newTestDB(t)
+	tempDir := t.TempDir()
+
+	// 1. Git project setup
+	gitProject := filepath.Join(tempDir, "git-project")
+	if err := os.MkdirAll(gitProject, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// Initialize git and set branch
+	for _, args := range [][]string{
+		{"init"},
+		{"config", "user.email", "test@example.com"},
+		{"config", "user.name", "Test User"},
+		{"checkout", "-b", "test-repair-branch"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = gitProject
+		_ = cmd.Run()
+	}
+
+	dummyFile := filepath.Join(gitProject, "dummy")
+	if err := os.WriteFile(dummyFile, []byte("dummy"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{
+		{"add", "dummy"},
+		{"commit", "-m", "initial"},
+	} {
+		cmd := exec.Command("git", args...)
+		cmd.Dir = gitProject
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("git %v failed: %v", args, err)
+		}
+	}
+
+	// 2. Non-Git project setup
+	nonGitProject := filepath.Join(tempDir, "nongit-project")
+	if err := os.MkdirAll(nonGitProject, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	// 3. Insert sessions
+	// Session 1: Git project, empty branch
+	_, err := db.Exec(`
+		INSERT INTO sessions (id, started_at, tool, project, model, branch)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		"sess-git", time.Now().UTC().Format(time.RFC3339), "claude-code", gitProject, "claude-3-5-sonnet", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Session 2: Non-Git project, empty branch
+	_, err = db.Exec(`
+		INSERT INTO sessions (id, started_at, tool, project, model, branch)
+		VALUES (?, ?, ?, ?, ?, ?)`,
+		"sess-nongit", time.Now().UTC().Format(time.RFC3339), "claude-code", nonGitProject, "claude-3-5-sonnet", "",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Run repairSessions
+	repairSessions(db)
+
+	// Verify Session 1 branch
+	var branch1 string
+	err = db.QueryRow("SELECT branch FROM sessions WHERE id=?", "sess-git").Scan(&branch1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if branch1 != "test-repair-branch" {
+		t.Errorf("expected branch1 to be %q, got %q", "test-repair-branch", branch1)
+	}
+
+	// Verify Session 2 branch
+	var branch2 string
+	err = db.QueryRow("SELECT branch FROM sessions WHERE id=?", "sess-nongit").Scan(&branch2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if branch2 != "-" {
+		t.Errorf("expected branch2 to be %q, got %q", "-", branch2)
+	}
+}
+
 
 
