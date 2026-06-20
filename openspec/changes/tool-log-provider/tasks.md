@@ -15,8 +15,8 @@
 
 ## 4. 實作 Copilot CLI Provider (CopilotProvider)
 
-- [ ] 4.1 撰寫單元測試，模擬 `events.jsonl` 日誌驗證 `CopilotProvider` 能夠正確擷取主模型及子代理模型 (非 `mainModel`) 的 token 消耗
-- [ ] 4.2 實作 `CopilotProvider` 解析 `events.jsonl` 中的 `session.shutdown` 事件，並支援 `ExtractLastTurn` 與 `ExtractWindow` 介面
+- [x] 4.1 撰寫單元測試，模擬 `events.jsonl` 日誌驗證 `CopilotProvider` 能夠正確擷取主模型及子代理模型 (非 `mainModel`) 的 token 消耗
+- [x] 4.2 實作 `CopilotProvider` 解析 `events.jsonl` 中的 `session.shutdown` 事件，並支援 `ExtractLastTurn` 與 `ExtractWindow` 介面
 
 ## 5. 整合與驗證
 
