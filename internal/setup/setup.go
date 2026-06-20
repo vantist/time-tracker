@@ -36,48 +36,30 @@ func SetupClaudeCode() error {
 		return err
 	}
 	claudeDir := filepath.Join(home, ".claude")
-	if err := os.MkdirAll(claudeDir, 0o700); err != nil {
-		return err
-	}
 	settingsPath := filepath.Join(claudeDir, "settings.json")
 
-	// Load existing settings
-	var settings map[string]interface{}
-	data, err := os.ReadFile(settingsPath)
-	if errors.Is(err, os.ErrNotExist) {
-		settings = map[string]interface{}{}
-	} else if err != nil {
-		return err
-	} else {
-		if err := json.Unmarshal(data, &settings); err != nil {
-			return fmt.Errorf("settings.json is corrupt: %w", err)
+	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
+		hooks, _ := settings["hooks"].(map[string]interface{})
+		if hooks == nil {
+			hooks = map[string]interface{}{}
 		}
-	}
-
-	// Merge hooks
-	hooks, _ := settings["hooks"].(map[string]interface{})
-	if hooks == nil {
-		hooks = map[string]interface{}{}
-	}
-	for event, hookVal := range ttHooks {
-		newEntries, _ := hookVal.([]interface{})
-		existing, _ := hooks[event].([]interface{})
-		var filtered []interface{}
-		for _, e := range existing {
-			em, _ := e.(map[string]interface{})
-			if em["_owner"] != "tt" {
-				filtered = append(filtered, e)
+		for event, hookVal := range ttHooks {
+			newEntries, _ := hookVal.([]interface{})
+			existing, _ := hooks[event].([]interface{})
+			var filtered []interface{}
+			for _, e := range existing {
+				em, _ := e.(map[string]interface{})
+				if em["_owner"] != "tt" {
+					filtered = append(filtered, e)
+				}
 			}
+			hooks[event] = append(filtered, newEntries...)
 		}
-		hooks[event] = append(filtered, newEntries...)
+		settings["hooks"] = hooks
+		return settings, nil
 	}
-	settings["hooks"] = hooks
 
-	out, err := json.MarshalIndent(settings, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(settingsPath, out, 0o600)
+	return mergeHooksFile(settingsPath, "tt", updater)
 }
 
 func mergeHooksFile(configPath string, defaultOwner string, updater func(map[string]interface{}) (map[string]interface{}, error)) error {
