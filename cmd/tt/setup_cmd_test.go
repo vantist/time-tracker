@@ -16,13 +16,8 @@ func setupHome(t *testing.T) string {
 	return home
 }
 
-func TestSetupCmd_Antigravity(t *testing.T) {
-	home := setupHome(t)
-
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
+func runSetupCmd(t *testing.T, args []string) (string, error) {
+	t.Helper()
 
 	// Reset flags to avoid pollution
 	setupCmd.Flags().Set("claude-code", "false")
@@ -30,19 +25,32 @@ func TestSetupCmd_Antigravity(t *testing.T) {
 	setupCmd.Flags().Set("antigravity", "false")
 	setupCmd.Flags().Set("codex", "false")
 
-	rootCmd.SetArgs([]string{"setup", "--antigravity"})
-	err := rootCmd.Execute()
+	// Capture stdout
+	oldStdout := os.Stdout
+	r, w, err := os.Pipe()
+	if err != nil {
+		return "", err
+	}
+	os.Stdout = w
+
+	rootCmd.SetArgs(append([]string{"setup"}, args...))
+	cmdErr := rootCmd.Execute()
 
 	w.Close()
 	os.Stdout = oldStdout
 
+	var buf bytes.Buffer
+	io.Copy(&buf, r)
+	return buf.String(), cmdErr
+}
+
+func TestSetupCmd_Antigravity(t *testing.T) {
+	home := setupHome(t)
+
+	output, err := runSetupCmd(t, []string{"--antigravity"})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg := "Google Antigravity hooks configured in ~/.gemini/config/hooks.json"
 	if !strings.Contains(output, expectedMsg) {
@@ -59,30 +67,10 @@ func TestSetupCmd_Antigravity(t *testing.T) {
 func TestSetupCmd_Codex(t *testing.T) {
 	home := setupHome(t)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Reset flags to avoid pollution
-	setupCmd.Flags().Set("claude-code", "false")
-	setupCmd.Flags().Set("copilot", "false")
-	setupCmd.Flags().Set("antigravity", "false")
-	setupCmd.Flags().Set("codex", "false")
-
-	rootCmd.SetArgs([]string{"setup", "--codex"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
+	output, err := runSetupCmd(t, []string{"--codex"})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg := "OpenAI Codex hooks configured in ~/.codex/hooks.json"
 	if !strings.Contains(output, expectedMsg) {
@@ -99,30 +87,10 @@ func TestSetupCmd_Codex(t *testing.T) {
 func TestSetupCmd_Copilot(t *testing.T) {
 	home := setupHome(t)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Reset flags to avoid pollution
-	setupCmd.Flags().Set("claude-code", "false")
-	setupCmd.Flags().Set("copilot", "false")
-	setupCmd.Flags().Set("antigravity", "false")
-	setupCmd.Flags().Set("codex", "false")
-
-	rootCmd.SetArgs([]string{"setup", "--copilot"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
+	output, err := runSetupCmd(t, []string{"--copilot"})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg := "GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json"
 	if !strings.Contains(output, expectedMsg) {
@@ -139,30 +107,10 @@ func TestSetupCmd_Copilot(t *testing.T) {
 func TestSetupCmd_MultiTool(t *testing.T) {
 	home := setupHome(t)
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Reset flags to avoid pollution
-	setupCmd.Flags().Set("claude-code", "false")
-	setupCmd.Flags().Set("copilot", "false")
-	setupCmd.Flags().Set("antigravity", "false")
-	setupCmd.Flags().Set("codex", "false")
-
-	rootCmd.SetArgs([]string{"setup", "--claude-code", "--copilot"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
+	output, err := runSetupCmd(t, []string{"--claude-code", "--copilot"})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg1 := "Claude Code hooks configured in ~/.claude/settings.json"
 	expectedMsg2 := "GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json"
@@ -195,30 +143,10 @@ func TestSetupCmd_AutoDetect(t *testing.T) {
 		t.Fatalf("failed to create .gemini: %v", err)
 	}
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Reset flags to avoid pollution
-	setupCmd.Flags().Set("claude-code", "false")
-	setupCmd.Flags().Set("copilot", "false")
-	setupCmd.Flags().Set("antigravity", "false")
-	setupCmd.Flags().Set("codex", "false")
-
-	rootCmd.SetArgs([]string{"setup"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
+	output, err := runSetupCmd(t, []string{})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg1 := "Claude Code hooks configured in ~/.claude/settings.json"
 	expectedMsg2 := "Google Antigravity hooks configured in ~/.gemini/config/hooks.json"
@@ -243,35 +171,13 @@ func TestSetupCmd_AutoDetect(t *testing.T) {
 func TestSetupCmd_NoToolsDetected(t *testing.T) {
 	_ = setupHome(t) // empty home
 
-	// Capture stdout
-	oldStdout := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	// Reset flags to avoid pollution
-	setupCmd.Flags().Set("claude-code", "false")
-	setupCmd.Flags().Set("copilot", "false")
-	setupCmd.Flags().Set("antigravity", "false")
-	setupCmd.Flags().Set("codex", "false")
-
-	rootCmd.SetArgs([]string{"setup"})
-	err := rootCmd.Execute()
-
-	w.Close()
-	os.Stdout = oldStdout
-
+	output, err := runSetupCmd(t, []string{})
 	if err != nil {
 		t.Fatalf("rootCmd Execute failed: %v", err)
 	}
-
-	var buf bytes.Buffer
-	io.Copy(&buf, r)
-	output := buf.String()
 
 	expectedMsg := "No supported AI tools detected..."
 	if !strings.Contains(output, expectedMsg) {
 		t.Errorf("output = %q, want message containing %q", output, expectedMsg)
 	}
 }
-
-

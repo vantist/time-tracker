@@ -31,12 +31,12 @@ func TestSetupClaudeCodeFresh(t *testing.T) {
 		t.Fatalf("settings.json not created: %v", err)
 	}
 
-	var settings map[string]interface{}
+	var settings map[string]any
 	if err := json.Unmarshal(data, &settings); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	hooks, ok := settings["hooks"].(map[string]interface{})
+	hooks, ok := settings["hooks"].(map[string]any)
 	if !ok {
 		t.Fatal("hooks key missing or wrong type")
 	}
@@ -61,19 +61,19 @@ func TestSetupClaudeCode_HookCommand(t *testing.T) {
 		t.Fatalf("read settings.json: %v", err)
 	}
 
-	var settings map[string]interface{}
+	var settings map[string]any
 	if err := json.Unmarshal(data, &settings); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	hooks := settings["hooks"].(map[string]interface{})
-	entries := hooks["UserPromptSubmit"].([]interface{})
+	hooks := settings["hooks"].(map[string]any)
+	entries := hooks["UserPromptSubmit"].([]any)
 	var cmd string
 	for _, e := range entries {
-		em := e.(map[string]interface{})
-		hs := em["hooks"].([]interface{})
+		em := e.(map[string]any)
+		hs := em["hooks"].([]any)
 		for _, h := range hs {
-			hm := h.(map[string]interface{})
+			hm := h.(map[string]any)
 			if c, ok := hm["command"].(string); ok {
 				cmd = c
 				break
@@ -106,15 +106,15 @@ func TestSetupClaudeCode_IdempotentNoDuplicates(t *testing.T) {
 	}
 
 	data, _ := os.ReadFile(filepath.Join(home, ".claude", "settings.json"))
-	var settings map[string]interface{}
+	var settings map[string]any
 	json.Unmarshal(data, &settings)
 
-	hooks := settings["hooks"].(map[string]interface{})
+	hooks := settings["hooks"].(map[string]any)
 	for _, event := range []string{"UserPromptSubmit", "Stop"} {
-		entries, _ := hooks[event].([]interface{})
+		entries, _ := hooks[event].([]any)
 		ttCount := 0
 		for _, e := range entries {
-			em, _ := e.(map[string]interface{})
+			em, _ := e.(map[string]any)
 			if em["_owner"] == "tt" {
 				ttCount++
 			}
@@ -132,13 +132,16 @@ func TestSetupClaudeCode_ReplacesOldVersion(t *testing.T) {
 	os.MkdirAll(claudeDir, 0o755)
 
 	// Pre-populate with an old tt hook (has _owner:"tt" but old command)
-	old := map[string]interface{}{
-		"hooks": map[string]interface{}{
-			"UserPromptSubmit": []interface{}{
-				map[string]interface{}{
+	old := map[string]any{
+		"hooks": map[string]any{
+			"UserPromptSubmit": []any{
+				map[string]any{
 					"_owner": "tt",
-					"hooks": []interface{}{
-						map[string]interface{}{"type": "command", "command": "tt record prompt --old"},
+					"hooks": []any{
+						map[string]any{
+							"type":    "command",
+							"command": "tt record prompt --old",
+						},
 					},
 				},
 			},
@@ -152,20 +155,20 @@ func TestSetupClaudeCode_ReplacesOldVersion(t *testing.T) {
 	}
 
 	data, _ = os.ReadFile(filepath.Join(claudeDir, "settings.json"))
-	var settings map[string]interface{}
+	var settings map[string]any
 	json.Unmarshal(data, &settings)
 
-	hooks := settings["hooks"].(map[string]interface{})
-	entries, _ := hooks["UserPromptSubmit"].([]interface{})
+	hooks := settings["hooks"].(map[string]any)
+	entries, _ := hooks["UserPromptSubmit"].([]any)
 	ttCount := 0
 	for _, e := range entries {
-		em, _ := e.(map[string]interface{})
+		em, _ := e.(map[string]any)
 		if em["_owner"] == "tt" {
 			ttCount++
 			// should be the new version, not the old command
-			hs, _ := em["hooks"].([]interface{})
+			hs, _ := em["hooks"].([]any)
 			for _, h := range hs {
-				hm, _ := h.(map[string]interface{})
+				hm, _ := h.(map[string]any)
 				if hm["command"] == "tt record prompt --old" {
 					t.Error("old hook command still present after setup")
 				}
@@ -184,12 +187,15 @@ func TestSetupClaudeCode_PreservesUserHooks(t *testing.T) {
 	os.MkdirAll(claudeDir, 0o755)
 
 	// Pre-populate with a user-owned hook (no _owner field)
-	existing := map[string]interface{}{
-		"hooks": map[string]interface{}{
-			"UserPromptSubmit": []interface{}{
-				map[string]interface{}{
-					"hooks": []interface{}{
-						map[string]interface{}{"type": "command", "command": "user-custom-hook"},
+	existing := map[string]any{
+		"hooks": map[string]any{
+			"UserPromptSubmit": []any{
+				map[string]any{
+					"hooks": []any{
+						map[string]any{
+							"type":    "command",
+							"command": "user-custom-hook",
+						},
 					},
 				},
 			},
@@ -203,18 +209,18 @@ func TestSetupClaudeCode_PreservesUserHooks(t *testing.T) {
 	}
 
 	data, _ = os.ReadFile(filepath.Join(claudeDir, "settings.json"))
-	var settings map[string]interface{}
+	var settings map[string]any
 	json.Unmarshal(data, &settings)
 
-	hooks := settings["hooks"].(map[string]interface{})
-	entries, _ := hooks["UserPromptSubmit"].([]interface{})
+	hooks := settings["hooks"].(map[string]any)
+	entries, _ := hooks["UserPromptSubmit"].([]any)
 	foundUser := false
 	for _, e := range entries {
-		em, _ := e.(map[string]interface{})
+		em, _ := e.(map[string]any)
 		if em["_owner"] != "tt" {
-			hs, _ := em["hooks"].([]interface{})
+			hs, _ := em["hooks"].([]any)
 			for _, h := range hs {
-				hm, _ := h.(map[string]interface{})
+				hm, _ := h.(map[string]any)
 				if hm["command"] == "user-custom-hook" {
 					foundUser = true
 				}
@@ -233,10 +239,17 @@ func TestSetupClaudeCodePreservesExistingHooks(t *testing.T) {
 	// Pre-populate settings with an existing hook
 	claudeDir := filepath.Join(home, ".claude")
 	os.MkdirAll(claudeDir, 0o755)
-	existing := map[string]interface{}{
-		"hooks": map[string]interface{}{
-			"PreToolUse": []interface{}{
-				map[string]interface{}{"hooks": []interface{}{map[string]interface{}{"type": "command", "command": "caveman-hook"}}},
+	existing := map[string]any{
+		"hooks": map[string]any{
+			"PreToolUse": []any{
+				map[string]any{
+					"hooks": []any{
+						map[string]any{
+							"type":    "command",
+							"command": "caveman-hook",
+						},
+					},
+				},
 			},
 		},
 	}
@@ -248,10 +261,10 @@ func TestSetupClaudeCodePreservesExistingHooks(t *testing.T) {
 	}
 
 	data, _ = os.ReadFile(filepath.Join(claudeDir, "settings.json"))
-	var settings map[string]interface{}
+	var settings map[string]any
 	json.Unmarshal(data, &settings)
 
-	hooks := settings["hooks"].(map[string]interface{})
+	hooks := settings["hooks"].(map[string]any)
 	if _, ok := hooks["PreToolUse"]; !ok {
 		t.Error("existing PreToolUse hook was removed")
 	}
@@ -265,12 +278,12 @@ func TestMergeHooksFile_CreatesDirAndFileWithCorrectPermissions(t *testing.T) {
 	subDir := filepath.Join(tmp, "nested_dir")
 	configPath := filepath.Join(subDir, "config.json")
 
-	updater := func(m map[string]interface{}) (map[string]interface{}, error) {
+	updater := func(m map[string]any) (map[string]any, error) {
 		m["key"] = "value"
 		return m, nil
 	}
 
-	err := setup.MergeHooksFile(configPath, "tt", updater)
+	err := setup.MergeHooksFile(configPath, updater)
 	if err != nil {
 		t.Fatalf("MergeHooksFile failed: %v", err)
 	}
@@ -280,7 +293,6 @@ func TestMergeHooksFile_CreatesDirAndFileWithCorrectPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to stat subDir: %v", err)
 	}
-	// On Unix/Mac, check the mode permissions. Mask with 0o777 to only keep standard permission bits.
 	if perm := dirInfo.Mode().Perm(); perm != 0o700 {
 		t.Errorf("subDir permissions = %o, want %o", perm, 0o700)
 	}
@@ -299,7 +311,7 @@ func TestMergeHooksFile_CreatesDirAndFileWithCorrectPermissions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read configPath: %v", err)
 	}
-	var res map[string]interface{}
+	var res map[string]any
 	if err := json.Unmarshal(data, &res); err != nil {
 		t.Fatalf("unmarshal config: %v", err)
 	}
@@ -312,16 +324,15 @@ func TestMergeHooksFile_HandlesCorruptJSON(t *testing.T) {
 	tmp := t.TempDir()
 	configPath := filepath.Join(tmp, "config.json")
 
-	// Pre-populate with corrupt JSON
 	if err := os.WriteFile(configPath, []byte("{invalid json"), 0o600); err != nil {
 		t.Fatalf("write file: %v", err)
 	}
 
-	updater := func(m map[string]interface{}) (map[string]interface{}, error) {
+	updater := func(m map[string]any) (map[string]any, error) {
 		return m, nil
 	}
 
-	err := setup.MergeHooksFile(configPath, "tt", updater)
+	err := setup.MergeHooksFile(configPath, updater)
 	if err == nil {
 		t.Error("expected error for corrupt JSON, got nil")
 	}
@@ -341,30 +352,30 @@ func TestSetupAntigravity(t *testing.T) {
 		t.Fatalf("hooks.json not created: %v", err)
 	}
 
-	var config map[string]interface{}
+	var config map[string]any
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("unmarshal hooks.json: %v", err)
 	}
 
-	ttVal, ok := config["tt"].(map[string]interface{})
+	ttVal, ok := config["tt"].(map[string]any)
 	if !ok {
 		t.Fatal("tt key missing or wrong type")
 	}
 
-	preInv, ok := ttVal["PreInvocation"].([]interface{})
+	preInv, ok := ttVal["PreInvocation"].([]any)
 	if !ok || len(preInv) != 1 {
 		t.Fatalf("PreInvocation missing or invalid size")
 	}
-	preMap := preInv[0].(map[string]interface{})
+	preMap := preInv[0].(map[string]any)
 	if preMap["_owner"] != "tt" || preMap["command"] != "tt record prompt --tool antigravity" || preMap["type"] != "command" {
 		t.Errorf("PreInvocation hook values unexpected: %v", preMap)
 	}
 
-	stop, ok := ttVal["Stop"].([]interface{})
+	stop, ok := ttVal["Stop"].([]any)
 	if !ok || len(stop) != 1 {
 		t.Fatalf("Stop missing or invalid size")
 	}
-	stopMap := stop[0].(map[string]interface{})
+	stopMap := stop[0].(map[string]any)
 	if stopMap["_owner"] != "tt" || stopMap["command"] != "tt record response --tool antigravity" || stopMap["type"] != "command" {
 		t.Errorf("Stop hook values unexpected: %v", stopMap)
 	}
@@ -375,22 +386,21 @@ func TestSetupAntigravity(t *testing.T) {
 	}
 	data, _ = os.ReadFile(configPath)
 	json.Unmarshal(data, &config)
-	ttVal = config["tt"].(map[string]interface{})
-	if len(ttVal["PreInvocation"].([]interface{})) != 1 || len(ttVal["Stop"].([]interface{})) != 1 {
+	ttVal = config["tt"].(map[string]any)
+	if len(ttVal["PreInvocation"].([]any)) != 1 || len(ttVal["Stop"].([]any)) != 1 {
 		t.Errorf("expected 1 hook entry per event, got PreInvocation count: %d, Stop count: %d",
-			len(ttVal["PreInvocation"].([]interface{})), len(ttVal["Stop"].([]interface{})))
+			len(ttVal["PreInvocation"].([]any)), len(ttVal["Stop"].([]any)))
 	}
 
 	// 3. Preserve User hooks
-	// Reset home with some existing user-owned hooks
 	home = setupHome(t)
 	configPath = filepath.Join(home, ".gemini", "config", "hooks.json")
 	geminiDir := filepath.Join(home, ".gemini", "config")
 	os.MkdirAll(geminiDir, 0o700)
-	userConfig := map[string]interface{}{
-		"tt": map[string]interface{}{
-			"PreInvocation": []interface{}{
-				map[string]interface{}{
+	userConfig := map[string]any{
+		"tt": map[string]any{
+			"PreInvocation": []any{
+				map[string]any{
 					"type":    "command",
 					"command": "user-pre-hook",
 				},
@@ -405,14 +415,14 @@ func TestSetupAntigravity(t *testing.T) {
 	}
 	data, _ = os.ReadFile(configPath)
 	json.Unmarshal(data, &config)
-	ttVal = config["tt"].(map[string]interface{})
-	preHooks := ttVal["PreInvocation"].([]interface{})
+	ttVal = config["tt"].(map[string]any)
+	preHooks := ttVal["PreInvocation"].([]any)
 	if len(preHooks) != 2 {
 		t.Fatalf("expected 2 prehooks, got %d", len(preHooks))
 	}
 	foundUser, foundTT := false, false
 	for _, e := range preHooks {
-		em := e.(map[string]interface{})
+		em := e.(map[string]any)
 		if em["_owner"] == "tt" {
 			foundTT = true
 		} else if em["command"] == "user-pre-hook" {
@@ -438,30 +448,30 @@ func TestSetupCodex(t *testing.T) {
 		t.Fatalf("hooks.json not created: %v", err)
 	}
 
-	var config map[string]interface{}
+	var config map[string]any
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("unmarshal hooks.json: %v", err)
 	}
 
-	hooksVal, ok := config["hooks"].(map[string]interface{})
+	hooksVal, ok := config["hooks"].(map[string]any)
 	if !ok {
 		t.Fatal("hooks key missing or wrong type")
 	}
 
-	promptSub, ok := hooksVal["UserPromptSubmit"].([]interface{})
+	promptSub, ok := hooksVal["UserPromptSubmit"].([]any)
 	if !ok || len(promptSub) != 1 {
 		t.Fatalf("UserPromptSubmit missing or invalid size")
 	}
-	promptMap := promptSub[0].(map[string]interface{})
+	promptMap := promptSub[0].(map[string]any)
 	if promptMap["_owner"] != "tt" || promptMap["command"] != "tt record prompt --tool codex" || promptMap["type"] != "command" {
 		t.Errorf("UserPromptSubmit hook values unexpected: %v", promptMap)
 	}
 
-	stop, ok := hooksVal["Stop"].([]interface{})
+	stop, ok := hooksVal["Stop"].([]any)
 	if !ok || len(stop) != 1 {
 		t.Fatalf("Stop missing or invalid size")
 	}
-	stopMap := stop[0].(map[string]interface{})
+	stopMap := stop[0].(map[string]any)
 	if stopMap["_owner"] != "tt" || stopMap["command"] != "tt record response --tool codex" || stopMap["type"] != "command" {
 		t.Errorf("Stop hook values unexpected: %v", stopMap)
 	}
@@ -472,22 +482,21 @@ func TestSetupCodex(t *testing.T) {
 	}
 	data, _ = os.ReadFile(configPath)
 	json.Unmarshal(data, &config)
-	hooksVal = config["hooks"].(map[string]interface{})
-	if len(hooksVal["UserPromptSubmit"].([]interface{})) != 1 || len(hooksVal["Stop"].([]interface{})) != 1 {
+	hooksVal = config["hooks"].(map[string]any)
+	if len(hooksVal["UserPromptSubmit"].([]any)) != 1 || len(hooksVal["Stop"].([]any)) != 1 {
 		t.Errorf("expected 1 hook entry per event, got UserPromptSubmit count: %d, Stop count: %d",
-			len(hooksVal["UserPromptSubmit"].([]interface{})), len(hooksVal["Stop"].([]interface{})))
+			len(hooksVal["UserPromptSubmit"].([]any)), len(hooksVal["Stop"].([]any)))
 	}
 
 	// 3. Preserve User hooks
-	// Reset home with some existing user-owned hooks
 	home = setupHome(t)
 	configPath = filepath.Join(home, ".codex", "hooks.json")
 	codexDir := filepath.Join(home, ".codex")
 	os.MkdirAll(codexDir, 0o700)
-	userConfig := map[string]interface{}{
-		"hooks": map[string]interface{}{
-			"UserPromptSubmit": []interface{}{
-				map[string]interface{}{
+	userConfig := map[string]any{
+		"hooks": map[string]any{
+			"UserPromptSubmit": []any{
+				map[string]any{
 					"type":    "command",
 					"command": "user-prompt-hook",
 				},
@@ -502,14 +511,14 @@ func TestSetupCodex(t *testing.T) {
 	}
 	data, _ = os.ReadFile(configPath)
 	json.Unmarshal(data, &config)
-	hooksVal = config["hooks"].(map[string]interface{})
-	promptHooks := hooksVal["UserPromptSubmit"].([]interface{})
+	hooksVal = config["hooks"].(map[string]any)
+	promptHooks := hooksVal["UserPromptSubmit"].([]any)
 	if len(promptHooks) != 2 {
 		t.Fatalf("expected 2 promptHooks, got %d", len(promptHooks))
 	}
 	foundUser, foundTT := false, false
 	for _, e := range promptHooks {
-		em := e.(map[string]interface{})
+		em := e.(map[string]any)
 		if em["_owner"] == "tt" {
 			foundTT = true
 		} else if em["command"] == "user-prompt-hook" {
@@ -534,36 +543,35 @@ func TestSetupCopilotFresh(t *testing.T) {
 		t.Fatalf("tt.json not created: %v", err)
 	}
 
-	var config map[string]interface{}
+	var config map[string]any
 	if err := json.Unmarshal(data, &config); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 
-	// check version
 	ver, ok := config["version"].(float64)
 	if !ok || ver != 1 {
 		t.Errorf("version = %v, want 1", config["version"])
 	}
 
-	hooks, ok := config["hooks"].(map[string]interface{})
+	hooks, ok := config["hooks"].(map[string]any)
 	if !ok {
 		t.Fatal("hooks key missing or wrong type")
 	}
 
-	promptHooks, ok := hooks["userPromptSubmitted"].([]interface{})
+	promptHooks, ok := hooks["userPromptSubmitted"].([]any)
 	if !ok || len(promptHooks) != 1 {
 		t.Fatalf("userPromptSubmitted missing or wrong size")
 	}
-	pMap := promptHooks[0].(map[string]interface{})
+	pMap := promptHooks[0].(map[string]any)
 	if pMap["_owner"] != "tt" || pMap["type"] != "command" || pMap["command"] != "tt record prompt --tool copilot-cli" {
 		t.Errorf("unexpected userPromptSubmitted hook: %v", pMap)
 	}
 
-	stopHooks, ok := hooks["agentStop"].([]interface{})
+	stopHooks, ok := hooks["agentStop"].([]any)
 	if !ok || len(stopHooks) != 1 {
 		t.Fatalf("agentStop missing or wrong size")
 	}
-	sMap := stopHooks[0].(map[string]interface{})
+	sMap := stopHooks[0].(map[string]any)
 	if sMap["_owner"] != "tt" || sMap["type"] != "command" || sMap["command"] != "tt record response --tool copilot-cli" {
 		t.Errorf("unexpected agentStop hook: %v", sMap)
 	}
@@ -599,15 +607,15 @@ func TestSetupCopilotIdempotent(t *testing.T) {
 
 	configPath := filepath.Join(home, ".copilot", "hooks", "tt.json")
 	data, _ := os.ReadFile(configPath)
-	var config map[string]interface{}
+	var config map[string]any
 	json.Unmarshal(data, &config)
 
-	hooks := config["hooks"].(map[string]interface{})
+	hooks := config["hooks"].(map[string]any)
 	for _, event := range []string{"userPromptSubmitted", "agentStop"} {
-		entries, _ := hooks[event].([]interface{})
+		entries, _ := hooks[event].([]any)
 		ttCount := 0
 		for _, e := range entries {
-			em, _ := e.(map[string]interface{})
+			em, _ := e.(map[string]any)
 			if em["_owner"] == "tt" {
 				ttCount++
 			}
@@ -623,11 +631,11 @@ func TestSetupCopilotPreservesUserHooks(t *testing.T) {
 	copilotDir := filepath.Join(home, ".copilot", "hooks")
 	os.MkdirAll(copilotDir, 0o700)
 
-	existing := map[string]interface{}{
+	existing := map[string]any{
 		"version": float64(1),
-		"hooks": map[string]interface{}{
-			"userPromptSubmitted": []interface{}{
-				map[string]interface{}{
+		"hooks": map[string]any{
+			"userPromptSubmitted": []any{
+				map[string]any{
 					"type":    "command",
 					"command": "user-custom-copilot-hook",
 				},
@@ -642,14 +650,14 @@ func TestSetupCopilotPreservesUserHooks(t *testing.T) {
 	}
 
 	data, _ = os.ReadFile(filepath.Join(copilotDir, "tt.json"))
-	var config map[string]interface{}
+	var config map[string]any
 	json.Unmarshal(data, &config)
 
-	hooks := config["hooks"].(map[string]interface{})
-	entries, _ := hooks["userPromptSubmitted"].([]interface{})
+	hooks := config["hooks"].(map[string]any)
+	entries, _ := hooks["userPromptSubmitted"].([]any)
 	foundUser, foundTT := false, false
 	for _, e := range entries {
-		em, _ := e.(map[string]interface{})
+		em, _ := e.(map[string]any)
 		if em["_owner"] == "tt" {
 			if em["command"] == "tt record prompt --tool copilot-cli" {
 				foundTT = true
@@ -668,11 +676,11 @@ func TestSetupCopilotReplacesOldVersion(t *testing.T) {
 	copilotDir := filepath.Join(home, ".copilot", "hooks")
 	os.MkdirAll(copilotDir, 0o700)
 
-	old := map[string]interface{}{
+	old := map[string]any{
 		"version": float64(1),
-		"hooks": map[string]interface{}{
-			"userPromptSubmitted": []interface{}{
-				map[string]interface{}{
+		"hooks": map[string]any{
+			"userPromptSubmitted": []any{
+				map[string]any{
 					"_owner":  "tt",
 					"type":    "command",
 					"command": "tt record prompt --old-args",
@@ -688,14 +696,14 @@ func TestSetupCopilotReplacesOldVersion(t *testing.T) {
 	}
 
 	data, _ = os.ReadFile(filepath.Join(copilotDir, "tt.json"))
-	var config map[string]interface{}
+	var config map[string]any
 	json.Unmarshal(data, &config)
 
-	hooks := config["hooks"].(map[string]interface{})
-	entries, _ := hooks["userPromptSubmitted"].([]interface{})
+	hooks := config["hooks"].(map[string]any)
+	entries, _ := hooks["userPromptSubmitted"].([]any)
 	ttCount := 0
 	for _, e := range entries {
-		em, _ := e.(map[string]interface{})
+		em, _ := e.(map[string]any)
 		if em["_owner"] == "tt" {
 			ttCount++
 			if em["command"] == "tt record prompt --old-args" {
@@ -709,108 +717,42 @@ func TestSetupCopilotReplacesOldVersion(t *testing.T) {
 }
 
 func TestIsActive(t *testing.T) {
-	t.Run("ClaudeCode", func(t *testing.T) {
-		home := setupHome(t)
-		if setup.IsClaudeCodeActive() {
-			t.Error("expected IsClaudeCodeActive to be false for non-existent dir")
-		}
+	tests := []struct {
+		name     string
+		dirName  string
+		activeFn func() bool
+	}{
+		{"ClaudeCode", ".claude", setup.IsClaudeCodeActive},
+		{"Copilot", ".copilot", setup.IsCopilotActive},
+		{"Antigravity", ".gemini", setup.IsAntigravityActive},
+		{"Codex", ".codex", setup.IsCodexActive},
+	}
 
-		claudeDir := filepath.Join(home, ".claude")
-		if err := os.MkdirAll(claudeDir, 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if !setup.IsClaudeCodeActive() {
-			t.Error("expected IsClaudeCodeActive to be true for existing dir")
-		}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			home := setupHome(t)
+			if tc.activeFn() {
+				t.Errorf("expected active to be false for non-existent dir")
+			}
 
-		// Cleanup and test file case
-		if err := os.RemoveAll(claudeDir); err != nil {
-			t.Fatalf("failed to remove dir: %v", err)
-		}
-		if err := os.WriteFile(claudeDir, []byte("plain file"), 0o600); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		if setup.IsClaudeCodeActive() {
-			t.Error("expected IsClaudeCodeActive to be false when path is a file")
-		}
-	})
+			dirPath := filepath.Join(home, tc.dirName)
+			if err := os.MkdirAll(dirPath, 0o755); err != nil {
+				t.Fatalf("failed to create dir: %v", err)
+			}
+			if !tc.activeFn() {
+				t.Errorf("expected active to be true for existing dir")
+			}
 
-	t.Run("Copilot", func(t *testing.T) {
-		home := setupHome(t)
-		if setup.IsCopilotActive() {
-			t.Error("expected IsCopilotActive to be false for non-existent dir")
-		}
-
-		copilotDir := filepath.Join(home, ".copilot")
-		if err := os.MkdirAll(copilotDir, 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if !setup.IsCopilotActive() {
-			t.Error("expected IsCopilotActive to be true for existing dir")
-		}
-
-		if err := os.RemoveAll(copilotDir); err != nil {
-			t.Fatalf("failed to remove dir: %v", err)
-		}
-		if err := os.WriteFile(copilotDir, []byte("plain file"), 0o600); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		if setup.IsCopilotActive() {
-			t.Error("expected IsCopilotActive to be false when path is a file")
-		}
-	})
-
-	t.Run("Antigravity", func(t *testing.T) {
-		home := setupHome(t)
-		if setup.IsAntigravityActive() {
-			t.Error("expected IsAntigravityActive to be false for non-existent dir")
-		}
-
-		geminiDir := filepath.Join(home, ".gemini")
-		if err := os.MkdirAll(geminiDir, 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if !setup.IsAntigravityActive() {
-			t.Error("expected IsAntigravityActive to be true for existing dir")
-		}
-
-		if err := os.RemoveAll(geminiDir); err != nil {
-			t.Fatalf("failed to remove dir: %v", err)
-		}
-		if err := os.WriteFile(geminiDir, []byte("plain file"), 0o600); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		if setup.IsAntigravityActive() {
-			t.Error("expected IsAntigravityActive to be false when path is a file")
-		}
-	})
-
-	t.Run("Codex", func(t *testing.T) {
-		home := setupHome(t)
-		if setup.IsCodexActive() {
-			t.Error("expected IsCodexActive to be false for non-existent dir")
-		}
-
-		codexDir := filepath.Join(home, ".codex")
-		if err := os.MkdirAll(codexDir, 0o755); err != nil {
-			t.Fatalf("failed to create dir: %v", err)
-		}
-		if !setup.IsCodexActive() {
-			t.Error("expected IsCodexActive to be true for existing dir")
-		}
-
-		if err := os.RemoveAll(codexDir); err != nil {
-			t.Fatalf("failed to remove dir: %v", err)
-		}
-		if err := os.WriteFile(codexDir, []byte("plain file"), 0o600); err != nil {
-			t.Fatalf("failed to write file: %v", err)
-		}
-		if setup.IsCodexActive() {
-			t.Error("expected IsCodexActive to be false when path is a file")
-		}
-	})
+			// Cleanup and test file case
+			if err := os.RemoveAll(dirPath); err != nil {
+				t.Fatalf("failed to remove dir: %v", err)
+			}
+			if err := os.WriteFile(dirPath, []byte("plain file"), 0o600); err != nil {
+				t.Fatalf("failed to write file: %v", err)
+			}
+			if tc.activeFn() {
+				t.Errorf("expected active to be false when path is a file")
+			}
+		})
+	}
 }
-
-
-
-

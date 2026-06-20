@@ -8,68 +8,141 @@ import (
 	"path/filepath"
 )
 
-var ttHooks = map[string]interface{}{
-	"UserPromptSubmit": []interface{}{
-		map[string]interface{}{
+var ttHooks = map[string][]any{
+	"UserPromptSubmit": {
+		map[string]any{
 			"_owner": "tt",
-			"hooks": []interface{}{
-				map[string]interface{}{
+			"hooks": []any{
+				map[string]any{
 					"type":    "command",
 					"command": "tt record prompt",
 				},
 			},
 		},
 	},
-	"Stop": []interface{}{
-		map[string]interface{}{
+	"Stop": {
+		map[string]any{
 			"_owner": "tt",
-			"hooks": []interface{}{
-				map[string]interface{}{"type": "command", "command": "tt record response"},
+			"hooks": []any{
+				map[string]any{"type": "command", "command": "tt record response"},
 			},
 		},
 	},
 }
 
 func SetupClaudeCode() error {
+	updater := func(settings map[string]any) (map[string]any, error) {
+		return updateSection(settings, "hooks", ttHooks), nil
+	}
+	return setupToolHooks(filepath.Join(".claude", "settings.json"), updater)
+}
+
+func SetupAntigravity() error {
+	updater := func(settings map[string]any) (map[string]any, error) {
+		targetHooks := map[string][]any{
+			"PreInvocation": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record prompt --tool antigravity",
+				},
+			},
+			"Stop": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record response --tool antigravity",
+				},
+			},
+		}
+		return updateSection(settings, "tt", targetHooks), nil
+	}
+	return setupToolHooks(filepath.Join(".gemini", "config", "hooks.json"), updater)
+}
+
+func SetupCodex() error {
+	updater := func(settings map[string]any) (map[string]any, error) {
+		targetHooks := map[string][]any{
+			"UserPromptSubmit": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record prompt --tool codex",
+				},
+			},
+			"Stop": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record response --tool codex",
+				},
+			},
+		}
+		return updateSection(settings, "hooks", targetHooks), nil
+	}
+	return setupToolHooks(filepath.Join(".codex", "hooks.json"), updater)
+}
+
+func SetupCopilot() error {
+	updater := func(settings map[string]any) (map[string]any, error) {
+		settings["version"] = 1
+		targetHooks := map[string][]any{
+			"userPromptSubmitted": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record prompt --tool copilot-cli",
+				},
+			},
+			"agentStop": {
+				map[string]any{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record response --tool copilot-cli",
+				},
+			},
+		}
+		return updateSection(settings, "hooks", targetHooks), nil
+	}
+	return setupToolHooks(filepath.Join(".copilot", "hooks", "tt.json"), updater)
+}
+
+func setupToolHooks(subPath string, updater func(map[string]any) (map[string]any, error)) error {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return err
 	}
-	claudeDir := filepath.Join(home, ".claude")
-	settingsPath := filepath.Join(claudeDir, "settings.json")
-
-	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
-		hooks, _ := settings["hooks"].(map[string]interface{})
-		if hooks == nil {
-			hooks = map[string]interface{}{}
-		}
-		for event, hookVal := range ttHooks {
-			newEntries, _ := hookVal.([]interface{})
-			existing, _ := hooks[event].([]interface{})
-			hooks[event] = mergeHookEntries(existing, newEntries)
-		}
-		settings["hooks"] = hooks
-		return settings, nil
-	}
-
-	return mergeHooksFile(settingsPath, "tt", updater)
+	return mergeHooksFile(filepath.Join(home, subPath), updater)
 }
 
-func mergeHooksFile(configPath string, defaultOwner string, updater func(map[string]interface{}) (map[string]interface{}, error)) error {
+func updateSection(settings map[string]any, sectionName string, targetHooks map[string][]any) map[string]any {
+	section, _ := settings[sectionName].(map[string]any)
+	if section == nil {
+		section = map[string]any{}
+	}
+	for event, newEntries := range targetHooks {
+		existing, _ := section[event].([]any)
+		section[event] = mergeHookEntries(existing, newEntries)
+	}
+	settings[sectionName] = section
+	return settings
+}
+
+func mergeHooksFile(configPath string, updater func(map[string]any) (map[string]any, error)) error {
 	dir := filepath.Dir(configPath)
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 
-	var m map[string]interface{}
+	var m map[string]any
 	data, err := os.ReadFile(configPath)
 	if errors.Is(err, os.ErrNotExist) {
-		m = map[string]interface{}{}
+		m = map[string]any{}
 	} else if err != nil {
 		return err
 	} else {
 		if len(data) == 0 {
-			m = map[string]interface{}{}
+			m = map[string]any{}
 		} else {
 			if err := json.Unmarshal(data, &m); err != nil {
 				return fmt.Errorf("config is corrupt: %w", err)
@@ -89,140 +162,15 @@ func mergeHooksFile(configPath string, defaultOwner string, updater func(map[str
 	return os.WriteFile(configPath, out, 0o600)
 }
 
-func SetupAntigravity() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	configPath := filepath.Join(home, ".gemini", "config", "hooks.json")
-
-	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
-		ttSection, _ := settings["tt"].(map[string]interface{})
-		if ttSection == nil {
-			ttSection = map[string]interface{}{}
-		}
-
-		targetHooks := map[string][]interface{}{
-			"PreInvocation": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record prompt --tool antigravity",
-				},
-			},
-			"Stop": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record response --tool antigravity",
-				},
-			},
-		}
-
-		for event, newEntries := range targetHooks {
-			existing, _ := ttSection[event].([]interface{})
-			ttSection[event] = mergeHookEntries(existing, newEntries)
-		}
-		settings["tt"] = ttSection
-		return settings, nil
-	}
-
-	return mergeHooksFile(configPath, "tt", updater)
-}
-
-func SetupCodex() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	configPath := filepath.Join(home, ".codex", "hooks.json")
-
-	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
-		hooksSection, _ := settings["hooks"].(map[string]interface{})
-		if hooksSection == nil {
-			hooksSection = map[string]interface{}{}
-		}
-
-		targetHooks := map[string][]interface{}{
-			"UserPromptSubmit": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record prompt --tool codex",
-				},
-			},
-			"Stop": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record response --tool codex",
-				},
-			},
-		}
-
-		for event, newEntries := range targetHooks {
-			existing, _ := hooksSection[event].([]interface{})
-			hooksSection[event] = mergeHookEntries(existing, newEntries)
-		}
-		settings["hooks"] = hooksSection
-		return settings, nil
-	}
-
-	return mergeHooksFile(configPath, "tt", updater)
-}
-
-func SetupCopilot() error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
-	configPath := filepath.Join(home, ".copilot", "hooks", "tt.json")
-
-	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
-		settings["version"] = 1
-
-		hooks, _ := settings["hooks"].(map[string]interface{})
-		if hooks == nil {
-			hooks = map[string]interface{}{}
-		}
-
-		targetHooks := map[string][]interface{}{
-			"userPromptSubmitted": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record prompt --tool copilot-cli",
-				},
-			},
-			"agentStop": {
-				map[string]interface{}{
-					"_owner":  "tt",
-					"type":    "command",
-					"command": "tt record response --tool copilot-cli",
-				},
-			},
-		}
-
-		for event, newEntries := range targetHooks {
-			existing, _ := hooks[event].([]interface{})
-			hooks[event] = mergeHookEntries(existing, newEntries)
-		}
-		settings["hooks"] = hooks
-		return settings, nil
-	}
-
-	return mergeHooksFile(configPath, "tt", updater)
-}
-
 // mergeHookEntries filters out any existing hook entries with _owner == "tt",
 // and appends the new entries to the remaining ones.
-func mergeHookEntries(existing []interface{}, newEntries []interface{}) []interface{} {
-	var filtered []interface{}
+func mergeHookEntries(existing []any, newEntries []any) []any {
+	var filtered []any
 	for _, e := range existing {
-		em, _ := e.(map[string]interface{})
-		if em["_owner"] != "tt" {
-			filtered = append(filtered, e)
+		if em, ok := e.(map[string]any); ok && em["_owner"] == "tt" {
+			continue
 		}
+		filtered = append(filtered, e)
 	}
 	return append(filtered, newEntries...)
 }
@@ -234,10 +182,7 @@ func isDirActive(dirName string) bool {
 	}
 	path := filepath.Join(home, dirName)
 	info, err := os.Stat(path)
-	if err != nil {
-		return false
-	}
-	return info.IsDir()
+	return err == nil && info.IsDir()
 }
 
 // IsClaudeCodeActive checks if the ~/.claude directory exists.
@@ -259,5 +204,3 @@ func IsAntigravityActive() bool {
 func IsCodexActive() bool {
 	return isDirActive(".codex")
 }
-
-

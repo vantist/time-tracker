@@ -7,67 +7,82 @@ import (
 	"github.com/user/tt/internal/setup"
 )
 
+type toolInfo struct {
+	flagName string
+	desc     string
+	isActive func() bool
+	setup    func() error
+	msg      string
+}
+
+var tools = []toolInfo{
+	{
+		flagName: "claude-code",
+		desc:     "Set up Claude Code hooks",
+		isActive: setup.IsClaudeCodeActive,
+		setup:    setup.SetupClaudeCode,
+		msg:      "Claude Code hooks configured in ~/.claude/settings.json",
+	},
+	{
+		flagName: "copilot",
+		desc:     "Set up GitHub Copilot CLI hooks",
+		isActive: setup.IsCopilotActive,
+		setup:    setup.SetupCopilot,
+		msg:      "GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json",
+	},
+	{
+		flagName: "antigravity",
+		desc:     "Set up Google Antigravity hooks",
+		isActive: setup.IsAntigravityActive,
+		setup:    setup.SetupAntigravity,
+		msg:      "Google Antigravity hooks configured in ~/.gemini/config/hooks.json",
+	},
+	{
+		flagName: "codex",
+		desc:     "Set up OpenAI Codex hooks",
+		isActive: setup.IsCodexActive,
+		setup:    setup.SetupCodex,
+		msg:      "OpenAI Codex hooks configured in ~/.codex/hooks.json",
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(setupCmd)
-	setupCmd.Flags().Bool("claude-code", false, "Set up Claude Code hooks")
-	setupCmd.Flags().Bool("copilot", false, "Set up GitHub Copilot CLI hooks")
-	setupCmd.Flags().Bool("antigravity", false, "Set up Google Antigravity hooks")
-	setupCmd.Flags().Bool("codex", false, "Set up OpenAI Codex hooks")
+	for _, t := range tools {
+		setupCmd.Flags().Bool(t.flagName, false, t.desc)
+	}
 }
 
 var setupCmd = &cobra.Command{
 	Use:   "setup",
 	Short: "Configure AI tool hooks",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		claudeCode, _ := cmd.Flags().GetBool("claude-code")
-		copilot, _ := cmd.Flags().GetBool("copilot")
-		antigravity, _ := cmd.Flags().GetBool("antigravity")
-		codex, _ := cmd.Flags().GetBool("codex")
+		var selectedTools []toolInfo
+		anyFlagSet := false
 
-		anyFlagSet := claudeCode || copilot || antigravity || codex
+		for _, t := range tools {
+			if val, _ := cmd.Flags().GetBool(t.flagName); val {
+				selectedTools = append(selectedTools, t)
+				anyFlagSet = true
+			}
+		}
 
 		if !anyFlagSet {
-			claudeCode = setup.IsClaudeCodeActive()
-			copilot = setup.IsCopilotActive()
-			antigravity = setup.IsAntigravityActive()
-			codex = setup.IsCodexActive()
+			for _, t := range tools {
+				if t.isActive() {
+					selectedTools = append(selectedTools, t)
+				}
+			}
 		}
 
-		configuredAny := false
-
-		if claudeCode {
-			if err := setup.SetupClaudeCode(); err != nil {
+		for _, t := range selectedTools {
+			if err := t.setup(); err != nil {
 				return err
 			}
-			fmt.Println("Claude Code hooks configured in ~/.claude/settings.json")
-			configuredAny = true
+			fmt.Println(t.msg)
 		}
 
-		if copilot {
-			if err := setup.SetupCopilot(); err != nil {
-				return err
-			}
-			fmt.Println("GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json")
-			configuredAny = true
-		}
-
-		if antigravity {
-			if err := setup.SetupAntigravity(); err != nil {
-				return err
-			}
-			fmt.Println("Google Antigravity hooks configured in ~/.gemini/config/hooks.json")
-			configuredAny = true
-		}
-
-		if codex {
-			if err := setup.SetupCodex(); err != nil {
-				return err
-			}
-			fmt.Println("OpenAI Codex hooks configured in ~/.codex/hooks.json")
-			configuredAny = true
-		}
-
-		if !anyFlagSet && !configuredAny {
+		if !anyFlagSet && len(selectedTools) == 0 {
 			fmt.Println("No supported AI tools detected...")
 		}
 
