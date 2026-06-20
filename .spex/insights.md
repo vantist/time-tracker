@@ -193,3 +193,18 @@
 
 ---
 
+## 2026-06-20 — models-expansion-robust-suffix-normalization [spex-apply]
+
+**Promote candidates:**
+- [ ] Consolidate related unit tests into table-driven tests
+  > **Why**: When expanding pricing tables or adding test cases for new models, writing individual functions for each test case leads to huge amounts of boilerplate and duplicate assertions.
+  > **How to apply**: Group related function-level behavior (such as `Calculate`) into struct-based table-driven tests (`tests := []struct{...}`) to make test expansion declarative and clean.
+- [ ] Combine arithmetic operations to reduce floating-point divisions
+  > **Why**: Evaluating terms like `float64(tokens)/1e6 * rate` multiple times can lead to compounding floating-point precision issues and unnecessary division instructions.
+  > **How to apply**: Sum up the weighted token counts first, and then perform a single division by `1e6` at the end of the cost calculation function.
+
+**Plan deviations:** none
+
+---
+
+
