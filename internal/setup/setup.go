@@ -96,6 +96,101 @@ func mergeHooksFile(configPath string, defaultOwner string, updater func(map[str
 	return os.WriteFile(configPath, out, 0o600)
 }
 
+func SetupAntigravity() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(home, ".gemini", "config", "hooks.json")
+
+	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
+		ttSection, _ := settings["tt"].(map[string]interface{})
+		if ttSection == nil {
+			ttSection = map[string]interface{}{}
+		}
+
+		targetHooks := map[string][]interface{}{
+			"PreInvocation": {
+				map[string]interface{}{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record prompt --tool antigravity",
+				},
+			},
+			"Stop": {
+				map[string]interface{}{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record response --tool antigravity",
+				},
+			},
+		}
+
+		for event, newEntries := range targetHooks {
+			existing, _ := ttSection[event].([]interface{})
+			var filtered []interface{}
+			for _, e := range existing {
+				em, _ := e.(map[string]interface{})
+				if em["_owner"] != "tt" {
+					filtered = append(filtered, e)
+				}
+			}
+			ttSection[event] = append(filtered, newEntries...)
+		}
+		settings["tt"] = ttSection
+		return settings, nil
+	}
+
+	return mergeHooksFile(configPath, "tt", updater)
+}
+
+func SetupCodex() error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	configPath := filepath.Join(home, ".codex", "hooks.json")
+
+	updater := func(settings map[string]interface{}) (map[string]interface{}, error) {
+		hooksSection, _ := settings["hooks"].(map[string]interface{})
+		if hooksSection == nil {
+			hooksSection = map[string]interface{}{}
+		}
+
+		targetHooks := map[string][]interface{}{
+			"UserPromptSubmit": {
+				map[string]interface{}{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record prompt --tool codex",
+				},
+			},
+			"Stop": {
+				map[string]interface{}{
+					"_owner":  "tt",
+					"type":    "command",
+					"command": "tt record response --tool codex",
+				},
+			},
+		}
+
+		for event, newEntries := range targetHooks {
+			existing, _ := hooksSection[event].([]interface{})
+			var filtered []interface{}
+			for _, e := range existing {
+				em, _ := e.(map[string]interface{})
+				if em["_owner"] != "tt" {
+					filtered = append(filtered, e)
+				}
+			}
+			hooksSection[event] = append(filtered, newEntries...)
+		}
+		settings["hooks"] = hooksSection
+		return settings, nil
+	}
+
+	return mergeHooksFile(configPath, "tt", updater)
+}
 
 
 const CopilotInstructions = `To set up GitHub Copilot CLI hooks, add the following to ~/.copilot/settings.json:
