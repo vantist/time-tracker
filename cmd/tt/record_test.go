@@ -509,3 +509,64 @@ func TestRecordResponseCmd_Integration(t *testing.T) {
 		t.Errorf("expected command to exit silently with nil error even on db mismatch, got: %v", err)
 	}
 }
+
+func TestReadStdinJSON_Antigravity(t *testing.T) {
+	// Mock Stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	inputJSON := `{"conversationId": "gemini-session-123", "transcriptPath": "/path/to/transcript.jsonl"}`
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+
+	go func() {
+		w.Write([]byte(inputJSON))
+		w.Close()
+	}()
+
+	payload, err := readStdinJSON("antigravity")
+	if err != nil {
+		t.Fatalf("readStdinJSON failed: %v", err)
+	}
+	if payload == nil {
+		t.Fatal("expected payload to be non-nil")
+	}
+
+	if payload.SessionID != "gemini-session-123" {
+		t.Errorf("SessionID = %q, want %q", payload.SessionID, "gemini-session-123")
+	}
+	if payload.TranscriptPath != "/path/to/transcript.jsonl" {
+		t.Errorf("TranscriptPath = %q, want %q", payload.TranscriptPath, "/path/to/transcript.jsonl")
+	}
+}
+
+func TestReadStdinJSON_Codex(t *testing.T) {
+	// Mock Stdin
+	oldStdin := os.Stdin
+	defer func() { os.Stdin = oldStdin }()
+
+	inputJSON := `{"session_id": "codex-session-abc", "transcript_path": "/path/to/codex.jsonl"}`
+	r, w, _ := os.Pipe()
+	os.Stdin = r
+
+	go func() {
+		w.Write([]byte(inputJSON))
+		w.Close()
+	}()
+
+	payload, err := readStdinJSON("codex")
+	if err != nil {
+		t.Fatalf("readStdinJSON failed: %v", err)
+	}
+	if payload == nil {
+		t.Fatal("expected payload to be non-nil")
+	}
+
+	if payload.SessionID != "codex-session-abc" {
+		t.Errorf("SessionID = %q, want %q", payload.SessionID, "codex-session-abc")
+	}
+	if payload.TranscriptPath != "/path/to/codex.jsonl" {
+		t.Errorf("TranscriptPath = %q, want %q", payload.TranscriptPath, "/path/to/codex.jsonl")
+	}
+}
+

@@ -86,9 +86,12 @@ type hookPayload struct {
 	TranscriptPath string `json:"transcript_path"`
 	// Copilot CLI fields
 	CopilotSessionID string `json:"sessionId"`
+	// Antigravity fields
+	ConversationID            string `json:"conversationId,omitempty"`
+	AntigravityTranscriptPath string `json:"transcriptPath,omitempty"`
 }
 
-func readStdinJSON() (*hookPayload, error) {
+func readStdinJSON(tool string) (*hookPayload, error) {
 	stat, _ := os.Stdin.Stat()
 	if (stat.Mode() & os.ModeCharDevice) != 0 {
 		return nil, nil // interactive terminal, no stdin
@@ -104,6 +107,15 @@ func readStdinJSON() (*hookPayload, error) {
 	// normalise Copilot sessionId → session_id
 	if p.SessionID == "" && p.CopilotSessionID != "" {
 		p.SessionID = p.CopilotSessionID
+	}
+	// normalise Antigravity fields
+	if tool == "antigravity" {
+		if p.SessionID == "" && p.ConversationID != "" {
+			p.SessionID = p.ConversationID
+		}
+		if p.TranscriptPath == "" && p.AntigravityTranscriptPath != "" {
+			p.TranscriptPath = p.AntigravityTranscriptPath
+		}
 	}
 	return &p, nil
 }
@@ -141,11 +153,11 @@ func resolvePromptInputFromEnv() (recorder.PromptInput, error) {
 }
 
 func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
-	stdin, _ := readStdinJSON()
+	tool, _ := cmd.Flags().GetString("tool")
+	stdin, _ := readStdinJSON(tool)
 
 	sessionID, _ := cmd.Flags().GetString("session")
 	project, _ := cmd.Flags().GetString("project")
-	tool, _ := cmd.Flags().GetString("tool")
 	model, _ := cmd.Flags().GetString("model")
 	transcriptPath, _ := cmd.Flags().GetString("transcript-path")
 
@@ -178,7 +190,8 @@ func resolvePromptInput(cmd *cobra.Command) (recorder.PromptInput, error) {
 }
 
 func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJSON, model string, err error) {
-	stdin, _ := readStdinJSON()
+	tool, _ := cmd.Flags().GetString("tool")
+	stdin, _ := readStdinJSON(tool)
 
 	sessionID, _ = cmd.Flags().GetString("session")
 	tokensJSON, _ = cmd.Flags().GetString("tokens")
@@ -191,7 +204,6 @@ func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJS
 
 	// If tokensJSON was not provided via flag, extract from transcript.
 	if tokensJSON == "" {
-		tool, _ := cmd.Flags().GetString("tool")
 		var stableID, dbTool string
 		conn.QueryRow("SELECT id, tool FROM sessions WHERE id=?", sessionID).Scan(&stableID, &dbTool)
 		if stableID == "" {
