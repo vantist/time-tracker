@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -298,5 +299,55 @@ func TestIntegration_GitBranchRepair(t *testing.T) {
 	}
 	if *sess.Branch != "feature-abc" {
 		t.Fatalf("expected branch %q, got %q", "feature-abc", *sess.Branch)
+	}
+}
+
+func TestIntegration_ActiveTurnPreemption(t *testing.T) {
+	projDir := t.TempDir()
+	home := t.TempDir()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	_, _, err := runTT(t, home, dbPath, "", "record", "prompt",
+		"--session", "sess-preempt",
+		"--tool", "antigravity",
+		"--model", "gemini-3.5-flash",
+		"--project", projDir,
+	)
+	if err != nil {
+		t.Fatalf("first record prompt failed: %v", err)
+	}
+
+	dbConn, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+
+	oldTime := time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339)
+	_, err = dbConn.Exec("UPDATE turns SET prompt_at = ? WHERE session_id = 'sess-preempt'", oldTime)
+	if err != nil {
+		t.Fatalf("failed to age turn: %v", err)
+	}
+	dbConn.Close()
+
+	_, _, err = runTT(t, home, dbPath, "", "record", "prompt",
+		"--session", "sess-preempt",
+		"--tool", "antigravity",
+		"--model", "gemini-3.5-flash",
+		"--project", projDir,
+	)
+	if err != nil {
+		t.Fatalf("second record prompt failed: %v", err)
+	}
+
+	turns, err := getTurns(t, dbPath, "sess-preempt")
+	if err != nil {
+		t.Fatalf("failed to get turns: %v", err)
+	}
+	if len(turns) != 2 {
+		t.Fatalf("expected 2 total turns, got %d", len(turns))
+	}
+
+	if turns[0].ResponseAt == nil {
+		t.Fatal("expected first turn response_at to be non-nil (preempted)")
 	}
 }
