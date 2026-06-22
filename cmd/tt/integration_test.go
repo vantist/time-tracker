@@ -448,3 +448,34 @@ func TestIntegration_IdleThresholdReconcile(t *testing.T) {
 		t.Errorf("expected output_tokens to be 50, got %v", turnsOld[0].OutputTokens)
 	}
 }
+
+func TestIntegration_FallbackDefaultModel(t *testing.T) {
+	home := t.TempDir()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	expectedWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+
+	_, _, err = runTT(t, home, dbPath, "", "record", "prompt",
+		"--session", "sess-fallback",
+		"--tool", "antigravity",
+	)
+	if err != nil {
+		t.Fatalf("record prompt failed: %v", err)
+	}
+
+	sess, err := getSession(t, dbPath, "sess-fallback")
+	if err != nil {
+		t.Fatalf("failed to get session: %v", err)
+	}
+
+	if sess.Project != expectedWD {
+		t.Errorf("expected project %q, got %q", expectedWD, sess.Project)
+	}
+
+	if sess.Model != "gemini-3.5-flash" {
+		t.Errorf("expected model %q, got %q", "gemini-3.5-flash", sess.Model)
+	}
+}
