@@ -1,6 +1,8 @@
 package transcript
 
 import (
+	"bufio"
+	"bytes"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -236,13 +238,22 @@ func loadTranscript(path string) ([]entry, error) {
 	}
 	defer f.Close()
 	var all []entry
-	dec := json.NewDecoder(f)
-	for dec.More() {
+	sc := bufio.NewScanner(f)
+	buf := make([]byte, 64*1024)
+	sc.Buffer(buf, 1024*1024)
+	for sc.Scan() {
+		line := sc.Bytes()
+		if len(bytes.TrimSpace(line)) == 0 {
+			continue
+		}
 		var e entry
-		if err := dec.Decode(&e); err != nil {
+		if err := json.Unmarshal(line, &e); err != nil {
 			continue
 		}
 		all = append(all, e)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, err
 	}
 	return all, nil
 }

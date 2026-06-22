@@ -346,3 +346,41 @@ func TestExtractWindow_MultiModelSubagents(t *testing.T) {
 		t.Errorf("expected subagent gpt-4o usage (300, 150), got (%d, %d)", subGpt.InputTokens, subGpt.OutputTokens)
 	}
 }
+
+func TestExtractWindow_CorruptAndTrailingLines(t *testing.T) {
+	// Construct a long content block text to make the line size > 64KB (e.g. 100KB)
+	longText := make([]byte, 100*1024)
+	for i := range longText {
+		longText[i] = 'a'
+	}
+	longLine := `{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50},"content":[{"type":"text","text":"` + string(longText) + `"}]}}`
+
+	lines := []string{
+		`{"type":"user","isSidechain":false}`,
+		`{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":5}}}`,
+		// corrupt JSON line
+		`{"type":"assistant","isSidechain":false, "message": { "model":`,
+		// empty line
+		``,
+		// whitespace line
+		`   `,
+		// valid long line (>64KB)
+		longLine,
+		// empty line at EOF
+		``,
+	}
+	path := writeLines(t, lines)
+
+	result, err := transcript.ExtractWindow(path, 0, -1)
+	if err != nil {
+		t.Fatalf("ExtractWindow: %v", err)
+	}
+
+	if result.InputTokens() != 110 {
+		t.Errorf("InputTokens = %d, want 110", result.InputTokens())
+	}
+	if result.OutputTokens() != 55 {
+		t.Errorf("OutputTokens = %d, want 55", result.OutputTokens())
+	}
+}
+
