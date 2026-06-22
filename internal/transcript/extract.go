@@ -242,8 +242,8 @@ func loadTranscript(path string) ([]entry, error) {
 	buf := make([]byte, 64*1024)
 	sc.Buffer(buf, 1024*1024)
 	for sc.Scan() {
-		line := sc.Bytes()
-		if len(bytes.TrimSpace(line)) == 0 {
+		line := bytes.TrimSpace(sc.Bytes())
+		if len(line) == 0 {
 			continue
 		}
 		var e entry

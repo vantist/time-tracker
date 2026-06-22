@@ -3,6 +3,7 @@ package transcript_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/user/tt/internal/transcript"
@@ -349,11 +350,8 @@ func TestExtractWindow_MultiModelSubagents(t *testing.T) {
 
 func TestExtractWindow_CorruptAndTrailingLines(t *testing.T) {
 	// Construct a long content block text to make the line size > 64KB (e.g. 100KB)
-	longText := make([]byte, 100*1024)
-	for i := range longText {
-		longText[i] = 'a'
-	}
-	longLine := `{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50},"content":[{"type":"text","text":"` + string(longText) + `"}]}}`
+	longText := strings.Repeat("a", 100*1024)
+	longLine := `{"type":"assistant","isSidechain":false,"message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":100,"output_tokens":50},"content":[{"type":"text","text":"` + longText + `"}]}}`
 
 	lines := []string{
 		`{"type":"user","isSidechain":false}`,
