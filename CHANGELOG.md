@@ -1,5 +1,47 @@
 # Changelog
 
+## [1.10.0](https://github.com/vantist/time-tracker/compare/v1.9.0...v1.10.0) (2026-06-22)
+
+
+### Features
+
+* **cli:** integrate SetupCopilot into setup command --copilot flag ([f8de7ab](https://github.com/vantist/time-tracker/commit/f8de7abd44c15f58f17d1ceb5ed453795de6d129))
+* **cmd:** implement project path fallback and default model resolution ([c92b5ed](https://github.com/vantist/time-tracker/commit/c92b5ed0c51b66d3a19d8fb4a97bcabb9e3c01ff))
+* **cmd:** implement report command --output / -o file export flag ([7c99dec](https://github.com/vantist/time-tracker/commit/7c99dec880cc83224efd20e4fc72f3675bed45c2))
+* **dashboard:** add tooltip CSS and update HTML table headers ([0600f96](https://github.com/vantist/time-tracker/commit/0600f96a8f2d54cd752a3894619781ae6dab53a4))
+* **dashboard:** build interactive tooltips for tokens in all aggregated tables ([f1e7b5a](https://github.com/vantist/time-tracker/commit/f1e7b5a444899dfbb57efd05984f820f871e2004))
+* **reconcile:** backfill session model from reconciled turn ([5b58d36](https://github.com/vantist/time-tracker/commit/5b58d360cd1a78ce5cce96a4bb60ee338304db4e))
+* **reconcile:** call repairSessions inside reconcile flow ([cd0a78b](https://github.com/vantist/time-tracker/commit/cd0a78b832ea450fa27aa8c5b4c0eba873ebb2c8))
+* **reconcile:** enforce 15-minute idle-threshold on dangling active turns ([c5a4321](https://github.com/vantist/time-tracker/commit/c5a43212328cbdce67ea9f752852e088238c6dec))
+* **reconcile:** implement gitBranch helper for fetching git branch name ([8428284](https://github.com/vantist/time-tracker/commit/842828433528f8768d2ea8fea301d2be543a943e))
+* **reconcile:** implement historical session repairing helper ([697a78c](https://github.com/vantist/time-tracker/commit/697a78cc5d953d0b2da2be529235099814da6403))
+* **reconcile:** repair branch field in repairSessions and add test verification ([f4b1b15](https://github.com/vantist/time-tracker/commit/f4b1b15d40963764d2548a186108aedbafb80506))
+* **record, reconcile:** integrate LogProvider registry into record response and reconcile ([5fde0ac](https://github.com/vantist/time-tracker/commit/5fde0ace8f02d33624d5206bce835618ed50b2c5))
+* **recorder:** implement antigravity active turn preemption on prompt recording ([0667c45](https://github.com/vantist/time-tracker/commit/0667c45c11b40d8ac0a2fcf6cdfce4ab71e2fe78))
+* **record:** parse antigravity conversationId and transcriptPath ([6bde668](https://github.com/vantist/time-tracker/commit/6bde668ea20dd3a3e56e2e0c00cc515cdaa80a4b))
+* **report:** add cache token fields to report structs ([36de761](https://github.com/vantist/time-tracker/commit/36de761805fac70449c7e55e3b408c0a4aa3bd74))
+* **report:** aggregate CacheReadTokens and CacheCreationTokens across all report dimensions ([54b4ed6](https://github.com/vantist/time-tracker/commit/54b4ed6af27e9a503d36ca8b485656fe7ab11e08))
+* **report:** format detailed tokens in CLI output tables ([8bbf2c0](https://github.com/vantist/time-tracker/commit/8bbf2c02496981e12c04a0b275b61bbde4baedd6))
+* **setup:** add cli flags for antigravity and codex setup ([aee823b](https://github.com/vantist/time-tracker/commit/aee823be1e1902eae7362a05ca906955bb785759))
+* **setup:** add SetupAntigravity and SetupCodex functions ([bf664a9](https://github.com/vantist/time-tracker/commit/bf664a94f4f80b46ae09f207beb01b765108f674))
+* **setup:** implement SetupCopilot for idempotent Copilot CLI hook merging ([9954d14](https://github.com/vantist/time-tracker/commit/9954d147dc386a135d8f642c5538879166c39e20))
+* **setup:** implement smart auto-detection functions for AI tools ([7c58c53](https://github.com/vantist/time-tracker/commit/7c58c53095070b3de39417d8ab19ce47f3718b1a))
+* **setup:** support multi-tool setup and smart automatic detection in setup command ([f075231](https://github.com/vantist/time-tracker/commit/f07523124ec3b1f6ebcdf0f32109cc5b6506ad49))
+* **transcript:** add LogProvider interface and global registry ([aff3e69](https://github.com/vantist/time-tracker/commit/aff3e690fbddb0b5e1c34485167aeec1bea11ad2))
+* **transcript:** export GetAntigravityModel and add tests ([3e456c7](https://github.com/vantist/time-tracker/commit/3e456c797e133f06ef44abcfeacbfc44c80aba0e))
+* **transcript:** implement CopilotProvider with subagent tracking ([b5cc9c1](https://github.com/vantist/time-tracker/commit/b5cc9c1a71b882736343aca50c3381fb9a37a550))
+* **transcript:** implement JSONLProvider and concrete JSONL-based providers ([ed6cb6e](https://github.com/vantist/time-tracker/commit/ed6cb6e158d23eb8daa43ee82c0fd988ed855a75))
+
+
+### Bug Fixes
+
+* **reconcile:** support reconciling zero-token antigravity turns ([be1f91c](https://github.com/vantist/time-tracker/commit/be1f91c7ce553d9bfe28d2a0157ed59b5f403c3b))
+* **recorder:** deduplicate antigravity turns ([6353a51](https://github.com/vantist/time-tracker/commit/6353a51ff8481c43f44aedc6fcee00f7a56ce5dc))
+* **record:** resolve Copilot CLI prompt transcriptPath and cwd loss ([c548b94](https://github.com/vantist/time-tracker/commit/c548b943ffdf208f536fdd383f4ddd459977a046))
+* **transcript:** extract and normalize antigravity model from settings.json ([1db0fe9](https://github.com/vantist/time-tracker/commit/1db0fe973019fa081442bbeac3acbb7f06445f77))
+* **transcript:** fallback path resolution in AntigravityProvider ([5f17449](https://github.com/vantist/time-tracker/commit/5f1744983e7e24d359252adce5e016974b3dabd3))
+* **transcript:** resolve hang on corrupt or trailing lines via bufio.Scanner ([5d2db9b](https://github.com/vantist/time-tracker/commit/5d2db9bb8f7b959f5207e13e319d02e826750ef9))
+
 ## [1.9.0](https://github.com/vantist/time-tracker/compare/v1.8.0...v1.9.0) (2026-06-20)
 
 
