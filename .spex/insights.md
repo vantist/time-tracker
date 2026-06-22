@@ -1,5 +1,19 @@
 # Spex Insights
 
+## 2026-06-22 — integration-testing-unpushed-features [spex-apply]
+
+**Promote candidates:**
+- [ ] Override `PROCESS_PID` and `PROCESS_START` env vars in E2E tests to isolate process keys
+  > **Why**: By default, CLI hooks deduce process identity based on the parent process PID and start time. In multi-step integration tests, multiple command invocations share the same test runner process PID, causing separate tests to collate into the same session.
+  > **How to apply**: In E2E tests executing CLI commands, override process identity by explicitly setting different `PROCESS_PID` and `PROCESS_START` values in the environment before running each tool.
+- [ ] Write mock transcript files in two steps (before prompt, and append response before response command) to E2E test offset parsing
+  > **Why**: When recording a prompt, the hook records the line offset in the transcript. If the response exists in the file before the prompt command is run, the offset will capture it as historical, causing subsequent response commands to skip parsing.
+  > **How to apply**: When E2E testing transcript offset parsing, always write the prompt-only transcript before running `record prompt`, then append LLM responses before calling `record response`.
+
+**Plan deviations:** none
+
+---
+
 ## 2026-06-21 — repair-session-branch [spex-apply]
 
 **Promote candidates:**
