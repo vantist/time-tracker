@@ -351,3 +351,100 @@ func TestIntegration_ActiveTurnPreemption(t *testing.T) {
 		t.Fatal("expected first turn response_at to be non-nil (preempted)")
 	}
 }
+
+func TestIntegration_IdleThresholdReconcile(t *testing.T) {
+	home := t.TempDir()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	_, _, err := runTT(t, home, dbPath, "", "report")
+	if err != nil {
+		t.Fatalf("failed to initialize db: %v", err)
+	}
+
+	transDir := t.TempDir()
+	transPath := filepath.Join(transDir, "transcript.jsonl")
+	content := `{"type":"user","isSidechain":false}
+{"type":"assistant","isSidechain":false,"message":{"model":"claude-3-5-sonnet","usage":{"input_tokens":100,"output_tokens":50}}}
+`
+	if err := os.WriteFile(transPath, []byte(content), 0644); err != nil {
+		t.Fatalf("failed to write transcript: %v", err)
+	}
+
+	dbConn, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer dbConn.Close()
+
+	parentPID := os.Getpid()
+
+	_, err = dbConn.Exec(`
+		INSERT INTO sessions (id, project, tool, model, started_at, process_pid, process_start)
+		VALUES ('sess-idle-recent', '/proj', 'claude-code', 'claude-3-5', '2026-06-22T00:00:00Z', ?, 0)
+	`, parentPID)
+	if err != nil {
+		t.Fatalf("failed to insert session recent: %v", err)
+	}
+
+	timeRecent := time.Now().UTC().Add(-5 * time.Minute).Format(time.RFC3339)
+	_, err = dbConn.Exec(`
+		INSERT INTO turns (session_id, prompt_at, transcript_path, prompt_line_offset)
+		VALUES ('sess-idle-recent', ?, ?, 0)
+	`, timeRecent, transPath)
+	if err != nil {
+		t.Fatalf("failed to insert recent turn: %v", err)
+	}
+
+	_, err = dbConn.Exec(`
+		INSERT INTO sessions (id, project, tool, model, started_at, process_pid, process_start)
+		VALUES ('sess-idle-old', '/proj', 'claude-code', 'claude-3-5', '2026-06-22T00:00:00Z', ?, 0)
+	`, parentPID)
+	if err != nil {
+		t.Fatalf("failed to insert session old: %v", err)
+	}
+
+	timeOld := time.Now().UTC().Add(-20 * time.Minute).Format(time.RFC3339)
+	_, err = dbConn.Exec(`
+		INSERT INTO turns (session_id, prompt_at, transcript_path, prompt_line_offset)
+		VALUES ('sess-idle-old', ?, ?, 0)
+	`, timeOld, transPath)
+	if err != nil {
+		t.Fatalf("failed to insert old turn: %v", err)
+	}
+
+	dbConn.Close()
+
+	_, _, err = runTT(t, home, dbPath, "", "report")
+	if err != nil {
+		t.Logf("report run finished: %v", err)
+	}
+
+	turnsRecent, err := getTurns(t, dbPath, "sess-idle-recent")
+	if err != nil {
+		t.Fatalf("failed to get recent turns: %v", err)
+	}
+	if len(turnsRecent) != 1 {
+		t.Fatalf("expected 1 recent turn, got %d", len(turnsRecent))
+	}
+	if turnsRecent[0].ResponseAt != nil {
+		t.Errorf("expected recent active turn NOT to be reconciled, but got response_at: %s", *turnsRecent[0].ResponseAt)
+	}
+
+	turnsOld, err := getTurns(t, dbPath, "sess-idle-old")
+	if err != nil {
+		t.Fatalf("failed to get old turns: %v", err)
+	}
+	if len(turnsOld) != 1 {
+		t.Fatalf("expected 1 old turn, got %d", len(turnsOld))
+	}
+
+	if turnsOld[0].ResponseAt == nil {
+		t.Fatal("expected old active turn response_at to be non-nil (reconciled)")
+	}
+	if turnsOld[0].InputTokens == nil || *turnsOld[0].InputTokens != 100 {
+		t.Errorf("expected input_tokens to be 100, got %v", turnsOld[0].InputTokens)
+	}
+	if turnsOld[0].OutputTokens == nil || *turnsOld[0].OutputTokens != 50 {
+		t.Errorf("expected output_tokens to be 50, got %v", turnsOld[0].OutputTokens)
+	}
+}

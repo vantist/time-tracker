@@ -8,7 +8,7 @@
 
 - [x] 2.1 實作 TestIntegration_GitBranchRepair 測試案例，驗證 `reconcile` 自動修復無 branch 資訊的 session
 - [x] 2.2 實作 TestIntegration_ActiveTurnPreemption 測試案例，驗證連續錄製 prompt 時，前一個 turn 被 preempt 關閉
-- [ ] 2.3 實作 TestIntegration_IdleThresholdReconcile 測試案例，驗證超時 15 分鐘的 dangling turn 會被自動 reconcile 關閉
+- [x] 2.3 實作 TestIntegration_IdleThresholdReconcile 測試案例，驗證超時 15 分鐘的 dangling turn 會被自動 reconcile 關閉
 - [ ] 2.4 實作 TestIntegration_FallbackDefaultModel 測試案例，驗證缺省欄位時自動 fallback 當前路徑與預設模型
 - [ ] 2.5 實作 TestIntegration_MultiToolIntegration 測試案例，模擬 Claude Code、Copilot CLI、Google Antigravity 的 stdin 與 log 檔案，驗證寫入與 token 解析
 
