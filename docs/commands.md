@@ -11,36 +11,47 @@ go build -o tt ./cmd/tt
 
 ### `tt record prompt`
 
-記錄 prompt 事件（由 Claude Code `UserPromptSubmit` hook 觸發）。
+記錄 prompt 事件（由 AI 工具的 hook 觸發）。
 
 ```bash
 tt record prompt [flags]
 ```
 
-| Flag | 說明 |
-|------|------|
-| `--session string` | Session ID（stdin 優先） |
-| `--project string` | 專案路徑（stdin 優先） |
-| `--tool string` | 工具名稱（預設：`claude-code`） |
-| `--model string` | 模型名稱（stdin 優先） |
+| Flag | 說明 | 預設 |
+|------|------|------|
+| `--session string` | Session ID（覆寫 stdin） | `""` |
+| `--project string` | 專案路徑（覆寫 stdin） | `""` |
+| `--tool string` | 工具名稱 | `"claude-code"` |
+| `--model string` | 模型名稱（覆寫 stdin） | `""` |
+| `--transcript-path string` | 對話紀錄 JSONL 路徑（覆寫 stdin） | `""` |
 
-stdin 格式：`{"session_id":"...","cwd":"/path","model":"claude-sonnet-4-6"}`
+**stdin 格式：**
+支援 JSON 物件，可用欄位包括：
+- `session_id` / `sessionId` / `conversationId` (適用於 `antigravity`)：Session ID
+- `cwd`：目前工作目錄（專案路徑）
+- `model`：模型名稱
+- `transcript_path` / `transcriptPath`：對話紀錄檔案路徑
 
 ---
 
 ### `tt record response`
 
-記錄 response 事件（由 Claude Code `Stop` hook 觸發）。
+記錄 response 或是停止事件（由 AI 工具的 hook 觸發）。
 
 ```bash
 tt record response [flags]
 ```
 
-| Flag | 說明 |
-|------|------|
-| `--session string` | Session ID（stdin 優先） |
-| `--tokens string` | Token 用量 JSON |
-| `--tool string` | 工具名稱（預設：`claude-code`） |
+| Flag | 說明 | 預設 |
+|------|------|------|
+| `--session string` | Session ID（覆寫 stdin） | `""` |
+| `--tokens string` | Token 用量 JSON 字串（覆寫 stdin） | `""` |
+| `--tool string` | 工具名稱 | `"claude-code"` |
+
+**stdin 格式：**
+支援 JSON 物件，可用欄位包括：
+- `session_id` / `sessionId` / `conversationId` (適用於 `antigravity`)：Session ID
+- `transcript_path` / `transcriptPath`：對話紀錄檔案路徑（當 `--tokens` 未提供時，會以此路徑解析對話內容並自動計算 token）
 
 ---
 
@@ -54,7 +65,11 @@ tt work                 # 顯示目前工作項目
 tt work --clear         # 清除工作項目
 ```
 
-儲存於 `~/.tt/work-item`，下次 `record prompt` 自動帶入。
+| Flag | 說明 | 預設 |
+|------|------|------|
+| `--clear` | 清除目前的工作項目 | `false` |
+
+儲存於 `~/.tt/work-items/<projectKey>`（由專案路徑 SHA256 決定），下次 `record prompt` 自動帶入。
 
 ---
 
@@ -68,10 +83,11 @@ tt report [flags]
 
 | Flag | 說明 | 預設 |
 |------|------|------|
-| `--since string` | 時間範圍：`7d`、`30d`、`YYYY-MM-DD` | `7d` |
-| `--project string` | 篩選專案名稱 | （全部） |
-| `--format string` | 輸出格式：`text` 或 `json` | `text` |
-| `--by-work-item` | 依工作項目分組 | false |
+| `--since string` | 時間範圍：`7d`、`30d` 或 `YYYY-MM-DD` | `"7d"` |
+| `--project string` | 篩選專案名稱 | `""` |
+| `--format string` | 輸出格式：`text` 或 `json` | `"text"` |
+| `--by-work-item` | 依工作項目分組 | `false` |
+| `-o, --output string` | 直接將報表內容寫入指定檔案 | `""` |
 
 ---
 
@@ -94,12 +110,30 @@ tt serve [flags]
 
 ### `tt setup`
 
-安裝 AI 工具 hook 整合。
+安裝與設定 AI 工具 hook 整合。
 
 ```bash
-tt setup --claude-code   # 自動寫入 ~/.claude/settings.json
-tt setup --copilot       # 顯示 Copilot CLI 手動設定說明
+tt setup [flags]
 ```
+
+| Flag | 說明 | 預設 |
+|------|------|------|
+| `--claude-code` | 設定 Claude Code hooks | `false` |
+| `--copilot` | 設定 GitHub Copilot CLI hooks | `false` |
+| `--antigravity` | 設定 Google Antigravity hooks | `false` |
+| `--codex` | 設定 OpenAI Codex hooks | `false` |
+
+---
+
+### `tt version`
+
+列印當前程式版本。
+
+```bash
+tt version
+```
+
+此指令無額外 flags。
 
 ---
 

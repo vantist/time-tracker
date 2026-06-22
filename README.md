@@ -1,6 +1,6 @@
 # tt — AI 工作時間追蹤器
 
-透過 Claude Code / Copilot CLI 的 hook 系統，靜默記錄每次 prompt/response 事件，輸出依專案、工作項目分組的時間與費用報表。
+透過 Claude Code / Copilot CLI / Antigravity 的 hook 系統，靜默記錄每次 prompt/response 事件，輸出依專案、工作項目分組的時間與費用報表。
 
 單一二進位，無外部 runtime 依賴，資料存於本地 SQLite。
 
@@ -31,7 +31,7 @@ go build -o tt ./cmd/tt
 1. 安裝 hook（一次性）：
 
 ```sh
-tt setup --claude-code
+tt setup --claude-code # 或是 --antigravity, --copilot, --codex 等
 ```
 
 2. 開始工作，可選標記工作項目：
@@ -51,8 +51,10 @@ tt report --since 30d --by-work-item
 
 | 指令 | 說明 |
 |------|------|
-| `tt setup --claude-code` | 自動寫入 Claude Code hook |
-| `tt setup --copilot` | 顯示 Copilot CLI 手動設定說明（尚未實測）|
+| `tt setup --claude-code` | 自動設定 Claude Code hook |
+| `tt setup --antigravity` | 自動設定 Google Antigravity hook |
+| `tt setup --copilot` | 自動設定 GitHub Copilot CLI hook |
+| `tt setup --codex` | 自動設定 OpenAI Codex hook |
 | `tt work [label]` | 設定 / 顯示 / `--clear` 工作項目標記 |
 | `tt report` | 顯示時間與費用報表 |
 | `tt serve` | 啟動 Web dashboard（預設 port 7890） |
@@ -76,9 +78,9 @@ tt report --since 30d --by-work-item
 
 ## Hook 原理
 
-> **注意**：Copilot CLI hook 整合尚未實際測試，設定說明僅供參考。
+`tt setup <flag>` 會在對應的 AI 工具設定檔中合併 hook 設定。
 
-`tt setup --claude-code` 將以下 hook 合併至 `~/.claude/settings.json`：
+以 Claude Code 為例，`tt setup --claude-code` 將以下 hook 合併至 `~/.claude/settings.json`：
 
 ```json
 {
