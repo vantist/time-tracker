@@ -17,7 +17,7 @@
 
 - [x] 4.1 `internal/setup/opencode.go`：實作 `SetupOpencode`——產生 `~/.config/opencode/plugins/tt-bridge.ts`，冪等（已存在則不覆蓋並輸出提示，不存在則建父目錄後寫入並輸出 `OpenCode plugin configured in ~/.config/opencode/plugins/tt-bridge.ts`）。TDD：先寫失敗測試涵蓋首次產生與已存在跳過。
 - [x] 4.2 `cmd/tt/setup_cmd.go`：新增 `--opencode` flag 並接線至 `SetupOpencode`。TDD：先寫失敗測試驗證 flag 觸發 setup。
-- [ ] 4.3 `internal/setup/setup.go`：將 opencode 納入多工具 setup 分派、`~/.config/opencode` 自動偵測、以及 no-tool-warning 檢查清單。TDD：先寫失敗測試涵蓋自動偵測 opencode 與無工具時提示。
+- [x] 4.3 `internal/setup/setup.go`：將 opencode 納入多工具 setup 分派、`~/.config/opencode` 自動偵測、以及 no-tool-warning 檢查清單。TDD：先寫失敗測試涵蓋自動偵測 opencode 與無工具時提示。
 
 ## 5. report 工具名正規化
 
