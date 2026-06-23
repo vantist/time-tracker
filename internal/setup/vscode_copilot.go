@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-// IsVSCodeCopilotActive checks if VS Code is installed and has GitHub Copilot Chat extension.
+// IsVSCodeCopilotActive checks if VS Code is installed and has GitHub Copilot Chat data.
 func IsVSCodeCopilotActive() bool {
 	// Check if VS Code is installed
 	codePath := findVSCodePath()
@@ -16,39 +16,55 @@ func IsVSCodeCopilotActive() bool {
 		return false
 	}
 
-	// Check if GitHub Copilot Chat extension is installed
+	// Check if Copilot Chat data exists in workspaceStorage
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return false
 	}
 
-	var extensionsDir string
+	var workspaceStorageBase string
 	switch runtime.GOOS {
 	case "darwin":
-		extensionsDir = filepath.Join(home, ".vscode", "extensions")
+		workspaceStorageBase = filepath.Join(home, "Library", "Application Support")
 	case "linux":
-		extensionsDir = filepath.Join(home, ".vscode", "extensions")
+		workspaceStorageBase = filepath.Join(home, ".config")
 	case "windows":
-		extensionsDir = filepath.Join(home, ".vscode", "extensions")
+		workspaceStorageBase = os.Getenv("APPDATA")
+		if workspaceStorageBase == "" {
+			workspaceStorageBase = filepath.Join(home, "AppData", "Roaming")
+		}
 	}
 
-	if extensionsDir == "" {
+	if workspaceStorageBase == "" {
 		return false
 	}
 
-	entries, err := os.ReadDir(extensionsDir)
+	// Check for GitHub.copilot-chat directories in workspaceStorage
+	variants := []string{"Code", "Code - Insiders", "VSCodium", "Cursor"}
+	for _, variant := range variants {
+		workspaceStorage := filepath.Join(workspaceStorageBase, variant, "User", "workspaceStorage")
+		if hasCopilotChatData(workspaceStorage) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// hasCopilotChatData checks if any workspaceStorage directory has GitHub.copilot-chat data.
+func hasCopilotChatData(workspaceStorage string) bool {
+	entries, err := os.ReadDir(workspaceStorage)
 	if err != nil {
 		return false
 	}
 
 	for _, entry := range entries {
-		if entry.IsDir() && filepath.Ext(entry.Name()) == "" {
-			// Check for github.copilot-chat extension
-			if len(entry.Name()) > len("github.copilot-chat") {
-				if entry.Name()[:len("github.copilot-chat")] == "github.copilot-chat" {
-					return true
-				}
-			}
+		if !entry.IsDir() {
+			continue
+		}
+		chatDir := filepath.Join(workspaceStorage, entry.Name(), "GitHub.copilot-chat")
+		if info, err := os.Stat(chatDir); err == nil && info.IsDir() {
+			return true
 		}
 	}
 
