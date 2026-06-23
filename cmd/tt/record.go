@@ -303,7 +303,9 @@ func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJS
 	}
 
 	// If tokensJSON was not provided via flag, extract from transcript.
-	if tokensJSON == "" {
+	// opencode tokens come from event flags, so it must never fall back to
+	// the transcript parser (even when --tokens is empty).
+	if tokensJSON == "" && tool != "opencode" {
 		var stableID, dbTool string
 		conn.QueryRow("SELECT id, tool FROM sessions WHERE id=?", sessionID).Scan(&stableID, &dbTool)
 		if stableID == "" {
@@ -311,6 +313,11 @@ func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJS
 		}
 		if (tool == "" || tool == "claude-code") && dbTool != "" {
 			tool = dbTool
+		}
+
+		// When the stored tool is opencode, there is no transcript to mine.
+		if dbTool == "opencode" {
+			return sessionID, tokensJSON, model, nil
 		}
 
 		p, ok := transcript.GetProvider(tool)
