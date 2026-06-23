@@ -32,6 +32,7 @@ func init() {
 	recordResponseCmd.Flags().String("tokens", "", "tokens JSON string (overrides stdin)")
 	recordResponseCmd.Flags().String("subagent-tokens", "", "subagent tokens JSON array (opencode event path)")
 	recordResponseCmd.Flags().String("tool", "claude-code", "tool name")
+	recordResponseCmd.Flags().String("model", "", "model name (overrides stdin)")
 }
 
 var recordCmd = &cobra.Command{
@@ -297,10 +298,14 @@ func resolveResponseInput(cmd *cobra.Command, conn *sql.DB) (sessionID, tokensJS
 
 	sessionID, _ = cmd.Flags().GetString("session")
 	tokensJSON, _ = cmd.Flags().GetString("tokens")
+	model, _ = cmd.Flags().GetString("model")
 
 	if stdin != nil {
 		if sessionID == "" {
 			sessionID = stdin.SessionID
+		}
+		if model == "" {
+			model = stdin.Model
 		}
 	}
 

@@ -101,6 +101,14 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string, subagentT
 	if cost != nil {
 		costVal = *cost
 	}
+
+	// Remove any backfill entries for this turn (migration artifacts with model='unknown')
+	// before inserting real usage data.
+	_, err = tx.Exec("DELETE FROM turn_model_usages WHERE turn_id=? AND model='unknown'", turnID)
+	if err != nil {
+		return err
+	}
+
 	_, err = tx.Exec(`
 		INSERT OR REPLACE INTO turn_model_usages (
 			turn_id, model, is_subagent,

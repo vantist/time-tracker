@@ -575,3 +575,100 @@ func TestIntegration_MultiToolIntegration(t *testing.T) {
 		})
 	}
 }
+
+// Integration test: tt setup --opencode produces valid TS file, and the
+// opencode record flow (prompt + response with subagent-tokens) writes
+// sessions / turns / turn_model_usages correctly.
+func TestIntegration_OpenCode_FullFlow(t *testing.T) {
+	home := t.TempDir()
+	dbPath := filepath.Join(t.TempDir(), "test.db")
+
+	// 1. tt setup --opencode creates plugin file
+	stdout, stderr, err := runTT(t, home, dbPath, "", "setup", "--opencode")
+	if err != nil {
+		t.Fatalf("tt setup --opencode: %v, stderr: %s", err, stderr)
+	}
+	if !strings.Contains(stdout, "OpenCode plugin configured in") {
+		t.Errorf("unexpected setup output: %s", stdout)
+	}
+
+	pluginPath := filepath.Join(home, ".config", "opencode", "plugins", "tt-bridge.ts")
+	if _, err := os.Stat(pluginPath); err != nil {
+		t.Fatalf("plugin file not created: %v", err)
+	}
+
+	// 2. tt record prompt --tool opencode creates session + turn
+	_, stderr, err = runTT(t, home, dbPath, "", "record", "prompt",
+		"--tool", "opencode", "--session", "sess-oc-int", "--project", "/repo", "--model", "")
+	if err != nil {
+		t.Fatalf("tt record prompt: %v, stderr: %s", err, stderr)
+	}
+
+	sess := getSession(t, dbPath, "sess-oc-int")
+	if sess.Tool != "opencode" {
+		t.Errorf("session tool = %q, want opencode", sess.Tool)
+	}
+
+	turns := getTurns(t, dbPath, "sess-oc-int")
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 turn, got %d", len(turns))
+	}
+
+	// 3. tt record response with --subagent-tokens writes main + subagent usages
+	mainTokens := `{"input_tokens":500,"output_tokens":100,"cache_read_tokens":0,"cache_creation_tokens":0}`
+	subTokens := `[{"model":"claude-haiku","agent":"build","input_tokens":100,"output_tokens":50,"cache_read_tokens":20}]`
+	_, stderr, err = runTT(t, home, dbPath, "", "record", "response",
+		"--tool", "opencode", "--session", "sess-oc-int", "--model", "claude-sonnet-4-6",
+		"--tokens", mainTokens, "--subagent-tokens", subTokens)
+	if err != nil {
+		t.Fatalf("tt record response: %v, stderr: %s", err, stderr)
+	}
+
+	// Verify turn tokens
+	turns = getTurns(t, dbPath, "sess-oc-int")
+	if len(turns) != 1 {
+		t.Fatalf("expected 1 turn after response, got %d", len(turns))
+	}
+	trn := turns[0]
+	if trn.ResponseAt == nil {
+		t.Error("response_at not set")
+	}
+	if trn.InputTokens == nil || *trn.InputTokens != 500 {
+		t.Errorf("input_tokens = %v, want 500", trn.InputTokens)
+	}
+	if trn.OutputTokens == nil || *trn.OutputTokens != 100 {
+		t.Errorf("output_tokens = %v, want 100", trn.OutputTokens)
+	}
+
+	// Verify turn_model_usages: 1 main (is_subagent=0) + 1 subagent (is_subagent=1)
+	usages := getTurnModelUsages(t, dbPath, trn.ID)
+	if len(usages) != 2 {
+		t.Fatalf("expected 2 model usages, got %d", len(usages))
+	}
+
+	var mainUsage, subUsage *dbTurnModelUsage
+	for i := range usages {
+		if usages[i].IsSubagent {
+			subUsage = &usages[i]
+		} else {
+			mainUsage = &usages[i]
+		}
+	}
+
+	if mainUsage == nil {
+		t.Fatal("no main agent usage found")
+	}
+	if mainUsage.Model != "claude-sonnet-4-6" {
+		t.Errorf("main model = %q, want claude-sonnet-4-6", mainUsage.Model)
+	}
+
+	if subUsage == nil {
+		t.Fatal("no subagent usage found")
+	}
+	if subUsage.Model != "claude-haiku" {
+		t.Errorf("subagent model = %q, want claude-haiku", subUsage.Model)
+	}
+	if subUsage.InputTokens != 100 || subUsage.OutputTokens != 50 {
+		t.Errorf("subagent tokens = in=%d out=%d, want 100/50", subUsage.InputTokens, subUsage.OutputTokens)
+	}
+}
