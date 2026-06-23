@@ -248,3 +248,74 @@ func TestRecordResponseWritesModelUsages(t *testing.T) {
 		t.Errorf("cost mismatch in turn_model_usages: %f", cost)
 	}
 }
+
+// Task 3.1: parseSubagentTokensJSON parses an opencode --subagent-tokens JSON
+// array into ModelUsage entries (is_subagent = true). Covers single, multiple,
+// and missing-optional-field cases.
+func TestParseSubagentTokensJSON(t *testing.T) {
+	t.Run("empty string returns nil no error", func(t *testing.T) {
+		got, err := recorder.ParseSubagentTokensJSON("")
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if got != nil {
+			t.Errorf("got %v, want nil", got)
+		}
+	})
+
+	t.Run("single subagent", func(t *testing.T) {
+		in := `[{"model":"claude-haiku","agent":"build","input_tokens":100,"output_tokens":50,"cache_read_tokens":20}]`
+		got, err := recorder.ParseSubagentTokensJSON(in)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if len(got) != 1 {
+			t.Fatalf("len = %d, want 1", len(got))
+		}
+		u := got[0]
+		if u.Model != "claude-haiku" {
+			t.Errorf("Model = %q, want claude-haiku", u.Model)
+		}
+		if !u.IsSubagent {
+			t.Error("IsSubagent = false, want true")
+		}
+		if u.InputTokens != 100 || u.OutputTokens != 50 || u.CacheReadTokens != 20 {
+			t.Errorf("tokens = in=%d out=%d cr=%d, want 100/50/20", u.InputTokens, u.OutputTokens, u.CacheReadTokens)
+		}
+	})
+
+	t.Run("multiple subagents", func(t *testing.T) {
+		in := `[{"model":"claude-haiku","agent":"build","input_tokens":100,"output_tokens":50},` +
+			`{"model":"claude-haiku","agent":"explore","input_tokens":80,"output_tokens":30}]`
+		got, err := recorder.ParseSubagentTokensJSON(in)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		if len(got) != 2 {
+			t.Fatalf("len = %d, want 2", len(got))
+		}
+		if got[0].InputTokens != 100 || got[1].InputTokens != 80 {
+			t.Errorf("token order wrong: 0=%d 1=%d", got[0].InputTokens, got[1].InputTokens)
+		}
+	})
+
+	t.Run("missing optional fields default to 0", func(t *testing.T) {
+		in := `[{"model":"claude-haiku","agent":"build","input_tokens":100,"output_tokens":50}]`
+		got, err := recorder.ParseSubagentTokensJSON(in)
+		if err != nil {
+			t.Fatalf("err: %v", err)
+		}
+		u := got[0]
+		if u.CacheReadTokens != 0 || u.CacheCreationTokens != 0 || u.CacheCreation5m != 0 || u.CacheCreation1h != 0 {
+			t.Errorf("optional fields = cr=%d cc=%d cc5m=%d cc1h=%d, want all 0",
+				u.CacheReadTokens, u.CacheCreationTokens, u.CacheCreation5m, u.CacheCreation1h)
+		}
+	})
+
+	t.Run("malformed json returns error", func(t *testing.T) {
+		in := `[not valid json`
+		if _, err := recorder.ParseSubagentTokensJSON(in); err == nil {
+			t.Error("expected error for malformed JSON")
+		}
+	})
+}

@@ -6,15 +6,16 @@ import (
 	"time"
 
 	"github.com/user/tt/internal/pricing"
+	"github.com/user/tt/internal/transcript"
 )
 
 type tokenPayload struct {
-	InputTokens          int `json:"input_tokens"`
-	OutputTokens         int `json:"output_tokens"`
-	CacheReadTokens      int `json:"cache_read_tokens"`
-	CacheCreationTokens  int `json:"cache_creation_tokens"`
-	CacheCreate5m        int `json:"cache_creation_5m_tokens"`
-	CacheCreate1h        int `json:"cache_creation_1h_tokens"`
+	InputTokens         int `json:"input_tokens"`
+	OutputTokens        int `json:"output_tokens"`
+	CacheReadTokens     int `json:"cache_read_tokens"`
+	CacheCreationTokens int `json:"cache_creation_tokens"`
+	CacheCreate5m       int `json:"cache_creation_5m_tokens"`
+	CacheCreate1h       int `json:"cache_creation_1h_tokens"`
 }
 
 func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string, subagentTokensJSON string) error {
@@ -120,4 +121,40 @@ func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string, subagentT
 	}
 
 	return tx.Commit()
+}
+
+// parseSubagentTokensJSON parses an opencode --subagent-tokens JSON array into
+// ModelUsage entries marked as subagents. Missing optional token fields
+// default to 0 (schema is NOT NULL DEFAULT 0). Returns (nil, nil) on empty
+// input so callers can skip the DB step entirely.
+func parseSubagentTokensJSON(s string) ([]transcript.ModelUsage, error) {
+	if s == "" {
+		return nil, nil
+	}
+	var entries []struct {
+		Model           string `json:"model"`
+		Agent           string `json:"agent"`
+		InputTokens     int    `json:"input_tokens"`
+		OutputTokens    int    `json:"output_tokens"`
+		CacheReadTokens int    `json:"cache_read_tokens"`
+		CacheCreation   int    `json:"cache_creation_tokens"`
+		ReasoningTokens int    `json:"reasoning_tokens"`
+	}
+	if err := json.Unmarshal([]byte(s), &entries); err != nil {
+		return nil, err
+	}
+	out := make([]transcript.ModelUsage, 0, len(entries))
+	for _, e := range entries {
+		out = append(out, transcript.ModelUsage{
+			Model:               e.Model,
+			IsSubagent:          true,
+			InputTokens:         e.InputTokens,
+			OutputTokens:        e.OutputTokens,
+			CacheReadTokens:     e.CacheReadTokens,
+			CacheCreationTokens: e.CacheCreation,
+			CacheCreation5m:     0,
+			CacheCreation1h:     0,
+		})
+	}
+	return out, nil
 }
