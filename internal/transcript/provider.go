@@ -134,4 +134,5 @@ func init() {
 	Register("antigravity", &AntigravityProvider{JSONLProvider{SupportsSub: true}})
 	Register("codex", &CodexProvider{JSONLProvider{SupportsSub: false}})
 	Register("copilot-cli", &CopilotProvider{})
+	Register("vscode-copilot", &VSCodeCopilotProvider{})
 }
