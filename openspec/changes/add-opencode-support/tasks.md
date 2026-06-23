@@ -25,7 +25,7 @@
 
 ## 6. plugin template 與整合
 
-- [ ] 6.1 撰寫 `tt-bridge.ts` plugin 範本內容：`message.updated` event → `tt record prompt/response --tool opencode` flag 對應、subagent token 暫存（`pendingSubTokens`）與隨主 response flush、串流中間態防護（`time.completed`/`finish` 條件）、`dedupKey` 去重。
+- [x] 6.1 撰寫 `tt-bridge.ts` plugin 範本內容：`message.updated` event → `tt record prompt/response --tool opencode` flag 對應、subagent token 暫存（`pendingSubTokens`）與隨主 response flush、串流中間態防護（`time.completed`/`finish` 條件）、`dedupKey` 去重。
 - [ ] 6.2 整合測試：`tt setup --opencode` 產生合法 TS 檔，並以模擬的 `tt record prompt` + `tt record response --tokens --subagent-tokens` 呼叫驗證 `sessions` / `turns` / `turn_model_usages` 寫入正確（含 `is_subagent = 1` 明細）。
 
 ## 7. 開放問題驗證與建置
