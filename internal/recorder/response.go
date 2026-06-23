@@ -17,7 +17,7 @@ type tokenPayload struct {
 	CacheCreate1h        int `json:"cache_creation_1h_tokens"`
 }
 
-func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string) error {
+func RecordResponse(conn *sql.DB, sessionID, tokensJSON, model string, subagentTokensJSON string) error {
 	now := time.Now().UTC()
 
 	// Resolve to the stable sessions.id (may differ from sessionID when process key is in use).

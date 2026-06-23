@@ -154,3 +154,27 @@ func TestResolveResponseInput_OpenCode_SkipsTranscript(t *testing.T) {
 		t.Errorf("tokensJSON = %q, want empty string (opencode must not fall back to transcript parser)", tokensJSON)
 	}
 }
+
+// Task 2.3: record response accepts --subagent-tokens flag and parses it into
+// the recorder input. When not provided, the value must remain empty.
+func TestRecordResponseCmd_SubagentTokensFlag(t *testing.T) {
+	// Verify the flag is registered on recordResponseCmd.
+	subTokens, err := recordResponseCmd.Flags().GetString("subagent-tokens")
+	if err != nil {
+		t.Fatalf("flag --subagent-tokens not registered: %v", err)
+	}
+	if subTokens != "" {
+		t.Errorf("default --subagent-tokens = %q, want empty", subTokens)
+	}
+
+	// Set the flag and verify it survives a reset cycle (cobra flag usage test).
+	if err := recordResponseCmd.Flags().Set("subagent-tokens", `[{"model":"claude-haiku"}]`); err != nil {
+		t.Fatalf("set --subagent-tokens: %v", err)
+	}
+	got, _ := recordResponseCmd.Flags().GetString("subagent-tokens")
+	if got != `[{"model":"claude-haiku"}]` {
+		t.Errorf("got = %q, want the set value", got)
+	}
+	// Reset for cleanliness
+	recordResponseCmd.Flags().Set("subagent-tokens", "")
+}

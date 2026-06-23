@@ -16,8 +16,8 @@ func RecordPromptSilent(conn *sql.DB, input PromptInput) error {
 }
 
 // RecordResponseSilent calls RecordResponse and swallows any error to stderr.
-func RecordResponseSilent(conn *sql.DB, sessionID, tokensJSON, model string) error {
-	if err := RecordResponse(conn, sessionID, tokensJSON, model); err != nil {
+func RecordResponseSilent(conn *sql.DB, sessionID, tokensJSON, model string, subagentTokensJSON string) error {
+	if err := RecordResponse(conn, sessionID, tokensJSON, model, subagentTokensJSON); err != nil {
 		fmt.Fprintf(os.Stderr, "tt: record response error: %v\n", err)
 	}
 	return nil

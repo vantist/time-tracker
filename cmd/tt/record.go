@@ -30,6 +30,7 @@ func init() {
 
 	recordResponseCmd.Flags().String("session", "", "session ID (overrides stdin)")
 	recordResponseCmd.Flags().String("tokens", "", "tokens JSON string (overrides stdin)")
+	recordResponseCmd.Flags().String("subagent-tokens", "", "subagent tokens JSON array (opencode event path)")
 	recordResponseCmd.Flags().String("tool", "claude-code", "tool name")
 }
 
@@ -73,8 +74,9 @@ var recordResponseCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
+		subagentTokensJSON, _ := cmd.Flags().GetString("subagent-tokens")
 
-		return recorder.RecordResponseSilent(conn, sessionID, tokensJSON, model)
+		return recorder.RecordResponseSilent(conn, sessionID, tokensJSON, model, subagentTokensJSON)
 	},
 }
 

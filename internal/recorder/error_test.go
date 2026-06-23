@@ -28,7 +28,7 @@ func TestRecordResponseSilentOnDBError(t *testing.T) {
 	conn, _ := sql.Open("sqlite", ":memory:") // no schema → will error
 	conn.Close()
 
-	err := recorder.RecordResponseSilent(conn, "sess-err", `{"input_tokens":100}`, "")
+	err := recorder.RecordResponseSilent(conn, "sess-err", `{"input_tokens":100}`, "", "")
 	if err != nil {
 		t.Errorf("RecordResponseSilent returned error: %v", err)
 	}
