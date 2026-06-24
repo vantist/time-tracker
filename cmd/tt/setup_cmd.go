@@ -89,12 +89,15 @@ var setupCmd = &cobra.Command{
 			}
 		}
 
-		for _, t := range selectedTools {
-			if err := t.setup(); err != nil {
-				return err
-			}
+	for _, t := range selectedTools {
+		if err := t.setup(); err != nil {
+			return err
+		}
+		// VS Code Copilot handles its own messaging
+		if t.flagName != "vscode-copilot" {
 			fmt.Println(t.msg)
 		}
+	}
 
 		if !anyFlagSet && len(selectedTools) == 0 {
 			fmt.Println("No supported AI tools detected...")

@@ -91,9 +91,10 @@ func SetupVSCodeCopilot() error {
 	// Try to download from GitHub releases
 	vsixPath, err := downloadVSIX()
 	if err != nil {
-		fmt.Printf("Could not download extension: %v\n", err)
+		fmt.Printf("Could not auto-install extension: %v\n", err)
 		fmt.Println("To install manually:")
-		fmt.Printf("  %s --install-extension <path-to-vsix>\n", codePath)
+		fmt.Printf("  1. Download .vsix from https://github.com/vantist/time-tracker/releases\n")
+		fmt.Printf("  2. Run: %s --install-extension <path-to-vsix>\n", codePath)
 		return nil
 	}
 	defer os.Remove(vsixPath)
