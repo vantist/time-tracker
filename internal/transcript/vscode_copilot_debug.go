@@ -28,6 +28,7 @@ type DebugLLMRequestAttrs struct {
 // DebugSessionShutdownData contains per-model usage from a session.shutdown event.
 type DebugSessionShutdownData struct {
 	MainModel    string                              `json:"mainModel"`
+	CurrentModel string                              `json:"currentModel"`
 	ModelMetrics map[string]DebugShutdownMetrics     `json:"modelMetrics"`
 	TotalNanoAiu float64                             `json:"totalNanoAiu"`
 }
@@ -104,8 +105,12 @@ func ParseDebugLog(path string) (*DebugLogResult, error) {
 			}
 			result.TotalNanoAiu += data.TotalNanoAiu
 
+			mainModel := data.MainModel
+			if mainModel == "" {
+				mainModel = data.CurrentModel
+			}
 			for modelName, metrics := range data.ModelMetrics {
-				isSub := data.MainModel != "" && modelName != data.MainModel
+				isSub := mainModel != "" && modelName != mainModel
 				u := result.ModelBreakdown[modelName]
 				u.Model = modelName
 				u.IsSubagent = isSub

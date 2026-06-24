@@ -111,6 +111,34 @@ not valid json
 	}
 }
 
+func TestParseDebugLog_SessionShutdown_CurrentModelFallback(t *testing.T) {
+	content := `{"v":1,"ts":1780000000000,"type":"session.shutdown","data":{"mainModel":"","currentModel":"gpt-5","modelMetrics":{"gpt-5":{"usage":{"inputTokens":100,"outputTokens":50,"cacheReadTokens":10,"cacheWriteTokens":5}},"gpt-5-mini":{"usage":{"inputTokens":40,"outputTokens":20}}},"totalNanoAiu":123456789}}
+`
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "main.jsonl")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	result, err := ParseDebugLog(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	main := result.ModelBreakdown["gpt-5"]
+	if main.Model != "gpt-5" {
+		t.Errorf("expected main model gpt-5, got %q", main.Model)
+	}
+	if main.IsSubagent {
+		t.Error("expected gpt-5 to be main (IsSubagent=false), judged by currentModel")
+	}
+
+	sub := result.ModelBreakdown["gpt-5-mini"]
+	if !sub.IsSubagent {
+		t.Error("expected gpt-5-mini to be subagent (judged by currentModel)")
+	}
+}
+
 func TestDiscoverDebugLogPath(t *testing.T) {
 	path := DiscoverDebugLogPath("/workspace/storage", "session-123")
 	expected := "/workspace/storage/debug-logs/session-123/main.jsonl"

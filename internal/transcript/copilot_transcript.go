@@ -23,6 +23,7 @@ type copilotEvent struct {
 	Type string `json:"type"`
 	Data struct {
 		MainModel    string                         `json:"mainModel"`
+		CurrentModel string                         `json:"currentModel"`
 		ModelMetrics map[string]copilotModelMetrics `json:"modelMetrics"`
 	} `json:"data"`
 }
@@ -79,6 +80,9 @@ func (p *CopilotProvider) ExtractWindow(path string, fromOffset int, toOffset in
 
 		if event.Type == "session.shutdown" {
 			mainModel := event.Data.MainModel
+			if mainModel == "" {
+				mainModel = event.Data.CurrentModel
+			}
 			for modelName, metrics := range event.Data.ModelMetrics {
 				isSub := false
 				if mainModel != "" && modelName != mainModel {

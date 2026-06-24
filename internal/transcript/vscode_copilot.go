@@ -45,6 +45,7 @@ type VSCodeCopilotToolExecution struct {
 // VSCodeCopilotSessionShutdown is the data payload of a session.shutdown event.
 type VSCodeCopilotSessionShutdown struct {
 	MainModel    string                             `json:"mainModel"`
+	CurrentModel string                             `json:"currentModel"`
 	ModelMetrics map[string]VSCodeCopilotMetrics    `json:"modelMetrics"`
 	TotalNanoAiu float64                            `json:"totalNanoAiu"`
 }
@@ -110,6 +111,9 @@ func (p *VSCodeCopilotProvider) ExtractWindow(path string, fromOffset int, toOff
 				continue
 			}
 			mainModel := shutdown.MainModel
+			if mainModel == "" {
+				mainModel = shutdown.CurrentModel
+			}
 			for modelName, metrics := range shutdown.ModelMetrics {
 				isSub := mainModel != "" && modelName != mainModel
 				k := usageKey{model: modelName, isSubagent: isSub}

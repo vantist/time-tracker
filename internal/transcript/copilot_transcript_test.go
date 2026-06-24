@@ -55,6 +55,87 @@ func TestParseCopilotLog_FileNotFound(t *testing.T) {
 	}
 }
 
+func TestParseCopilotLog_CurrentModelFallback(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "events.jsonl")
+
+	lines := []string{
+		`{"type":"session.start","data":{}}`,
+		`{"type":"session.shutdown","data":{"mainModel":"","currentModel":"gpt-5","modelMetrics":{"gpt-5":{"usage":{"inputTokens":1000,"outputTokens":200}},"gpt-5-mini":{"usage":{"inputTokens":500,"outputTokens":100}}}}}`,
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	for _, line := range lines {
+		f.WriteString(line + "\n")
+	}
+	f.Close()
+
+	res, err := transcript.ParseCopilotLog(path)
+	if err != nil {
+		t.Fatalf("ParseCopilotLog failed: %v", err)
+	}
+
+	if got := res.Model(); got != "gpt-5" {
+		t.Errorf("Model() = %q, want %q (currentModel fallback)", got, "gpt-5")
+	}
+
+	var mainUsage, subUsage transcript.ModelUsage
+	for _, u := range res.Usages {
+		if u.Model == "gpt-5" {
+			mainUsage = u
+		} else if u.Model == "gpt-5-mini" {
+			subUsage = u
+		}
+	}
+	if mainUsage.IsSubagent {
+		t.Error("expected main model gpt-5 to have IsSubagent=false (judged by currentModel)")
+	}
+	if !subUsage.IsSubagent {
+		t.Error("expected subagent model gpt-5-mini to have IsSubagent=true (judged by currentModel)")
+	}
+}
+
+func TestParseCopilotLog_MainModelPrecedence(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "events.jsonl")
+
+	lines := []string{
+		`{"type":"session.start","data":{}}`,
+		`{"type":"session.shutdown","data":{"mainModel":"gpt-5","currentModel":"claude-3.5","modelMetrics":{"gpt-5":{"usage":{"inputTokens":1000,"outputTokens":200}},"claude-3.5":{"usage":{"inputTokens":500,"outputTokens":100}}}}}`,
+	}
+
+	f, err := os.Create(path)
+	if err != nil {
+		t.Fatalf("failed to create test file: %v", err)
+	}
+	for _, line := range lines {
+		f.WriteString(line + "\n")
+	}
+	f.Close()
+
+	res, err := transcript.ParseCopilotLog(path)
+	if err != nil {
+		t.Fatalf("ParseCopilotLog failed: %v", err)
+	}
+
+	if got := res.Model(); got != "gpt-5" {
+		t.Errorf("Model() = %q, want %q (mainModel takes precedence)", got, "gpt-5")
+	}
+
+	var subUsage transcript.ModelUsage
+	for _, u := range res.Usages {
+		if u.Model == "claude-3.5" {
+			subUsage = u
+		}
+	}
+	if !subUsage.IsSubagent {
+		t.Error("expected claude-3.5 to be subagent when mainModel=gpt-5")
+	}
+}
+
 func TestCopilotProvider_Subagents(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "events.jsonl")

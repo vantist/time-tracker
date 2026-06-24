@@ -110,3 +110,37 @@ func TestVSCodeCopilotProvider_SupportsSubagents(t *testing.T) {
 		t.Error("expected false for VS Code Copilot provider")
 	}
 }
+
+func TestVSCodeCopilotProvider_ShutdownCurrentModelFallback(t *testing.T) {
+	content := `{"type":"session.start","data":{"sessionId":"test-456"},"timestamp":"2026-06-24T00:00:00.000Z"}
+{"type":"session.shutdown","data":{"mainModel":"","currentModel":"gpt-5","modelMetrics":{"gpt-5":{"usage":{"inputTokens":100,"outputTokens":50}},"gpt-5-mini":{"usage":{"inputTokens":40,"outputTokens":20}}}},"timestamp":"2026-06-24T00:00:03.000Z"}
+`
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "test.jsonl")
+	if err := os.WriteFile(path, []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	p := &VSCodeCopilotProvider{}
+	result, err := p.ExtractWindow(path, 0, -1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := result.Model(); got != "gpt-5" {
+		t.Errorf("Model() = %q, want %q (currentModel fallback)", got, "gpt-5")
+	}
+
+	var subUsage *ModelUsage
+	for i := range result.Usages {
+		if result.Usages[i].Model == "gpt-5-mini" {
+			subUsage = &result.Usages[i]
+		}
+	}
+	if subUsage == nil {
+		t.Fatal("expected gpt-5-mini usage")
+	}
+	if !subUsage.IsSubagent {
+		t.Error("expected gpt-5-mini to be subagent (judged by currentModel)")
+	}
+}
