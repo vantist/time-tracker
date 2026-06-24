@@ -202,24 +202,6 @@
 
 ---
 
-## [spex-debugging] claude-code-token-null — 2026-06-18
-
-### Misses
-
-- 🟡 painful: model search bounded by `lastUserIdx` → `len(all)-1` → when Stop fires after `/clear`, `lastUserIdx` is the final entry; range is empty, model returns "".
-
-### Promote candidates
-
-- [x] `extractFromTranscript`: model is session-scoped, not turn-scoped — search entire transcript for last assistant entry, not just current-turn range
-  > **Why**: Bounded range `(lastUserIdx, end]` breaks whenever Stop fires before any new assistant entry is appended (e.g. `/clear`, rapid stop). Model doesn't change within a session, so searching the whole transcript is always correct.
-  > **How to apply**: When extracting session-scoped metadata from JSONL, search the full transcript (`i >= 0`), not just the current turn window.
-
-- [x] `extractFromTranscript`: token extraction needs fallback to previous turn window when /clear race occurs
-  > **Why**: Same root cause as model-extraction bug. When Stop fires immediately after /clear, `lastUserIdx` points to the /clear user entry — primary range `[lastUserIdx+1, end)` is empty. Fallback searches `[prevUserIdx+1, lastUserIdx)` to retrieve tokens from the actual last turn.
-  > **How to apply**: After primary range yields `total == 0`, find `prevUserIdx` (the user entry before `lastUserIdx`) and re-run dedup+sum on that window. Fixed in `cmd/tt/record.go:extractFromTranscript`.
-
-- Task 6.2 (update SQL grouping) was listed as conditional work but turned out to be N/A: report SQL already uses `sessions.id` as group key, and turns now correctly reference stable ID, so no SQL change was needed.
-
 ## 2026-06-19 — align-report-serve [spex-apply]
 
 **Promote candidates:**
@@ -385,6 +367,24 @@
 - [ ] Recorder should store git-root-resolved project path alongside raw cwd
   > **Why**: `workitem` keys work-item labels by git root (`ResolveProject`), but `recorder` stores the raw cwd as `sessions.project`. The report now shells out to `git rev-parse` per unique path at read time to normalize — this compensates for historical rows but is avoidable cost for future rows. Documenting this invariant prevents future "why does the report show subfolder names" regressions.
   > **How to apply**: Add a `project_root` column to `sessions` populated via `workitem.ResolveProject(input.Project)` at record time; report reads `project_root` directly and only falls back to read-time resolution for pre-migration rows. Normalize in `recorder.RecordPrompt` (recorder.go:34) so the invariant holds at the source.
+
+---
+
+## 2026-06-24 — copilot-cli-token-fix [spex-apply]
+
+**Promote candidates:**
+- [ ] Extract a `resolveTranscriptPathIfExists(tool, sessionID) (path string, found bool)` helper for the ResolvePath + os.Stat + silent-skip pattern
+  > **Why**: The pattern "derive transcript path via provider.ResolvePath(sessionID, ""), stat it, silent-skip on missing" now appears in 3 sites (reconcileTurn defensive guard, reconcileCopilotSession, repairSessions Copilot branch). Each duplicates `expandHomePath(p.ResolvePath(...))` + `os.Stat` + the missing-file return.
+  > **How to apply**: Add a helper in reconcile.go returning `(path, found)`. Use it in all 3 sites. Removes ~6 lines per site and ensures consistent silent-skip semantics for any future provider with sessionID-derivable paths.
+- [ ] Document the "session-cumulative vs per-turn-delta" token semantics distinction in transcript provider conventions
+  > **Why**: Copilot CLI `modelMetrics` is a session-cumulative snapshot (each session.shutdown contains the running total, not a per-event delta). ExtractWindow must reset `modelUsages` on each shutdown so only the latest cumulative value remains; summing would double-count across shutdowns. Claude Code / Antigravity tokens are per-turn deltas and must keep accumulating. This distinction is provider-specific and easy to get wrong when adding a new transcript provider.
+  > **How to apply**: Add a note to the transcript package doc or provider.go stating whether each provider's metrics are cumulative-snapshot (reset-on-event) or per-event-delta (accumulate), and that ExtractWindow must handle accordingly. Future providers should declare their semantics at registration.
+
+**Plan deviations:**
+- Task 4.1 said assert `turns.model` but `repairSessions` only updates `sessions.model`; test asserts `sessions.model` (matches spec scenario "Copilot session 用 CopilotProvider 解 model" which targets resolveModel → sessions.model). `turns.model` is set separately by reconcileCopilotSession.
+- Task 1.6 said modify `vscode_copilot.go` only; also modified `vscode_copilot_debug.go` because the spec scenario "mainModel empty falls back to currentModel" lives under the debug-logs requirement and that file has its own shutdown parser with the same `mainModel` bug. Broader fix, spec-aligned.
+
+---
 
 
 

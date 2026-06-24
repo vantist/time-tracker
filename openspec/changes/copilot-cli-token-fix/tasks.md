@@ -33,7 +33,7 @@
 
 ## 5. 整合驗證
 
-- [ ] 5.1 跑 `go test ./internal/transcript/ ./internal/reconcile/` 確認全綠
-- [ ] 5.2 跑 `go build ./...` 確認無編譯錯誤
-- [ ] 5.3 手動驗證：對真實 DB 的 `61232c8e` / `e0af7acb` session 跑 `tt report`，確認 token 非 0、model 非 `gemini-3.5-flash`
-- [ ] 5.4 跑 `go test ./...` 確認無回歸
+- [x] 5.1 跑 `go test ./internal/transcript/ ./internal/reconcile/` 確認全綠
+- [x] 5.2 跑 `go build ./...` 確認無編譯錯誤
+- [x] 5.3 手動驗證：對真實 DB 的 `61232c8e` / `e0af7acb` session 跑 `tt report`，確認 token 非 0、model 非 `gemini-3.5-flash`
+- [x] 5.4 跑 `go test ./...` 確認無回歸
