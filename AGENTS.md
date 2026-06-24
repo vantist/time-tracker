@@ -1,13 +1,13 @@
 # tt — AI Tool Time Tracker
 
-Go CLI，透過 Claude Code / Copilot CLI / Antigravity hook 自動記錄 AI 工作時間與 token 費用。本地 SQLite，單一二進位，零 runtime 依賴。
+Go CLI，透過 Claude Code / Copilot CLI / Antigravity / Codex / OpenCode / VS Code Copilot hook 自動記錄 AI 工作時間與 token 費用。本地 SQLite，單一二進位，零 runtime 依賴。
 
 ## Quick Start
 
 ```bash
 go build -o tt ./cmd/tt   # 建置
 go test ./...             # 執行測試
-tt setup --claude-code    # 安裝 Claude Code hooks
+tt setup                  # 自動偵測並安裝 hooks
 tt report --since 7d      # 查看過去 7 天報表
 tt work "feature-xyz"     # 標記目前工作項目
 ```
