@@ -1,11 +1,15 @@
 package setup
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 )
 
 // IsVSCodeCopilotActive checks if VS Code is installed and has GitHub Copilot Chat data.
@@ -71,24 +75,118 @@ func hasCopilotChatData(workspaceStorage string) bool {
 	return false
 }
 
-// SetupVSCodeCopilot installs the VS Code Copilot bridge extension.
+// SetupVSCodeCopilot downloads and installs the VS Code Copilot bridge extension.
 func SetupVSCodeCopilot() error {
 	codePath := findVSCodePath()
 	if codePath == "" {
 		return fmt.Errorf("VS Code not found, skipping VS Code Copilot bridge installation")
 	}
 
-	// For now, just print instructions since we don't have a .vsix to install
-	fmt.Println("To install the VS Code Copilot bridge:")
-	fmt.Println("  1. Open VS Code")
-	fmt.Println("  2. Press Ctrl+Shift+P (or Cmd+Shift+P on macOS)")
-	fmt.Println("  3. Type 'Extensions: Install from VSIX...'")
-	fmt.Println("  4. Select the tt-copilot-bridge.vsix file")
-	fmt.Println("")
-	fmt.Println("Alternatively, run:")
-	fmt.Printf("  %s --install-extension <path-to-vsix>\n", codePath)
+	// Check if extension is already installed
+	if isExtensionInstalled("tt.copilot-bridge") {
+		fmt.Println("VS Code Copilot bridge already installed")
+		return nil
+	}
 
+	// Try to download from GitHub releases
+	vsixPath, err := downloadVSIX()
+	if err != nil {
+		fmt.Printf("Could not download extension: %v\n", err)
+		fmt.Println("To install manually:")
+		fmt.Printf("  %s --install-extension <path-to-vsix>\n", codePath)
+		return nil
+	}
+	defer os.Remove(vsixPath)
+
+	// Install the extension
+	cmd := exec.Command(codePath, "--install-extension", vsixPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to install extension: %w", err)
+	}
+
+	fmt.Println("VS Code Copilot bridge installed successfully")
 	return nil
+}
+
+func isExtensionInstalled(extensionID string) bool {
+	codePath := findVSCodePath()
+	if codePath == "" {
+		return false
+	}
+
+	out, err := exec.Command(codePath, "--list-extensions").Output()
+	if err != nil {
+		return false
+	}
+
+	return strings.Contains(string(out), extensionID)
+}
+
+func downloadVSIX() (string, error) {
+	// Get latest release info from GitHub
+	resp, err := http.Get("https://api.github.com/repos/vantist/time-tracker/releases/latest")
+	if err != nil {
+		return "", fmt.Errorf("failed to fetch release info: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
+	}
+
+	// Parse response to find vsix asset URL
+	var release struct {
+		Assets []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", fmt.Errorf("failed to parse release info: %w", err)
+	}
+
+	var vsixURL string
+	for _, asset := range release.Assets {
+		if strings.HasSuffix(asset.Name, ".vsix") {
+			vsixURL = asset.BrowserDownloadURL
+			break
+		}
+	}
+
+	if vsixURL == "" {
+		return "", fmt.Errorf("no .vsix asset found in latest release")
+	}
+
+	// Download the .vsix file
+	tmpFile, err := os.CreateTemp("", "tt-copilot-bridge-*.vsix")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+
+	resp, err = http.Get(vsixURL)
+	if err != nil {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to download .vsix: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		tmpFile.Close()
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("download returned status %d", resp.StatusCode)
+	}
+
+	_, err = io.Copy(tmpFile, resp.Body)
+	tmpFile.Close()
+	if err != nil {
+		os.Remove(tmpFile.Name())
+		return "", fmt.Errorf("failed to save .vsix: %w", err)
+	}
+
+	return tmpFile.Name(), nil
 }
 
 func findVSCodePath() string {
