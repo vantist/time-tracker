@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.12.0](https://github.com/vantist/time-tracker/compare/v1.11.0...v1.12.0) (2026-06-24)
+
+
+### Features
+
+* **setup:** auto-download and install VS Code extension; add extension build to CI ([7163b74](https://github.com/vantist/time-tracker/commit/7163b743024eb5a47e300561573ea678b9c7add3))
+
+
+### Bug Fixes
+
+* **setup:** correct VS Code Copilot setup messaging ([5317630](https://github.com/vantist/time-tracker/commit/53176304b23c45cc212bfc482d107afef1b315f8))
+
 ## [1.11.0](https://github.com/vantist/time-tracker/compare/v1.10.0...v1.11.0) (2026-06-24)
 
 
