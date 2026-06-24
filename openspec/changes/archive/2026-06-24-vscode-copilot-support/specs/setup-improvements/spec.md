@@ -1,15 +1,4 @@
-# setup-improvements Specification
-
-## Purpose
-TBD - created by archiving change setup-cmd-improvements. Update Purpose after archive.
-## Requirements
-### Requirement: SetupCommandMultiToolSetup
-系統 SHALL 支援在執行 `tt setup` 時帶有複數個標記（例如 `--claude-code` 與 `--copilot`），且系統 SHALL 依序完成所有被選取之 AI 工具的 hook 設定，而不因其中一個設定成功而提早結束。
-
-#### Scenario: 同時設定多個工具的 hooks
-- **WHEN** 呼叫 `tt setup --claude-code --copilot` 且皆執行成功
-- **THEN** stdout 依序輸出 `Claude Code hooks configured in ~/.claude/settings.json` 與 `GitHub Copilot CLI hooks configured in ~/.copilot/hooks/tt.json`
-- **THEN** 同時更新 `~/.claude/settings.json` 與 `~/.copilot/hooks/tt.json`
+## MODIFIED Requirements
 
 ### Requirement: SetupCommandAutoDetection
 系統在執行 `tt setup` 且未帶有任何 flag 時，SHALL 自動偵測使用者家目錄（`HOME`）下是否存在各 AI 工具的設定目錄。若偵測到對應目錄存在，系統 SHALL 自動為該工具設定 hooks，不需使用者手動傳入 flag。
@@ -19,24 +8,26 @@ TBD - created by archiving change setup-cmd-improvements. Update Purpose after a
 - 若存在 `~/.copilot` 目錄，則自動設定 GitHub Copilot CLI hooks
 - 若存在 `~/.gemini` 目錄，則自動設定 Google Antigravity hooks
 - 若存在 `~/.codex` 目錄，則自動設定 OpenAI Codex hooks
-- 若存在 `~/.config/opencode` 目錄，則自動設定 OpenCode plugin
+- 若存在 VS Code 且已安裝 GitHub Copilot Chat 擴充套件，則自動設定 VS Code Copilot bridge
 
 #### Scenario: 自動偵測到部分工具存在並設定
 - **WHEN** 呼叫 `tt setup`（無參數），且家目錄下僅存在 `~/.claude` 與 `~/.gemini` 目錄
 - **THEN** 系統自動設定 Claude Code 與 Google Antigravity 的 hooks
 - **THEN** stdout 輸出 `Claude Code hooks configured in ~/.claude/settings.json` 與 `Google Antigravity hooks configured in ~/.gemini/config/hooks.json`
 
-#### Scenario: 自動偵測到 opencode 並設定 plugin
-- **WHEN** 呼叫 `tt setup`（無參數），且家目錄下僅存在 `~/.config/opencode` 目錄
-- **THEN** 系統自動設定 OpenCode plugin（產生 `~/.config/opencode/plugins/tt-bridge.ts`）
-- **THEN** stdout 輸出 `OpenCode plugin configured in ~/.config/opencode/plugins/tt-bridge.ts`
+#### Scenario: 自動偵測到 VS Code Copilot 並設定 bridge
+- **WHEN** 呼叫 `tt setup`（無參數），且偵測到 VS Code 已安裝 GitHub Copilot Chat 擴充套件
+- **THEN** 系統自動安裝 VS Code Copilot bridge extension
+- **THEN** stdout 輸出 `VS Code Copilot bridge installed`
 
 ### Requirement: SetupCommandNoToolWarning
 系統在執行 `tt setup` 且未帶有任何 flag 時，若未偵測到任何適用工具的設定目錄，SHALL 輸出友善提示訊息並結束，SHALL NOT 修改任何檔案。
 
 #### Scenario: 未偵測到任何適用工具時輸出提示
-- **WHEN** 呼叫 `tt setup`（無參數），且家目錄下不存在 `~/.claude`, `~/.copilot`, `~/.gemini`, `~/.codex`, `~/.config/opencode` 中的任何一個目錄
+- **WHEN** 呼叫 `tt setup`（無參數），且家目錄下不存在 `~/.claude`, `~/.copilot`, `~/.gemini`, `~/.codex` 中的任何一個目錄
 - **THEN** stdout 輸出 `No supported AI tools detected...` 提示訊息
+
+## ADDED Requirements
 
 ### Requirement: SetupCommandVSCodeCopilot
 系統 SHALL 支援 `tt setup --vscode-copilot` flag，用於安裝 VS Code Copilot bridge extension。
@@ -50,4 +41,3 @@ TBD - created by archiving change setup-cmd-improvements. Update Purpose after a
 - **WHEN** 呼叫 `tt setup --vscode-copilot`，但 VS Code 未安裝
 - **THEN** 系統輸出警告訊息 `VS Code not found, skipping VS Code Copilot bridge installation`
 - **THEN** 不修改任何檔案
-

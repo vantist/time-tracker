@@ -377,6 +377,15 @@
   > **Why**: Settings files of different tools use dots (Claude Opus 4.6), while the internal pricing table uses hyphens (claude-opus-4-6). Fallback lookup prevents cost estimation failure on minor formatting inconsistencies.
   > **How to apply**: Implement fallback lookup logic in pricing tools that replaces dots with hyphens if direct map lookup fails.
 
+---
+
+## [spex-debugging] workitem-project-not-git-root — 2026-06-24
+
+### Promote candidates
+- [ ] Recorder should store git-root-resolved project path alongside raw cwd
+  > **Why**: `workitem` keys work-item labels by git root (`ResolveProject`), but `recorder` stores the raw cwd as `sessions.project`. The report now shells out to `git rev-parse` per unique path at read time to normalize — this compensates for historical rows but is avoidable cost for future rows. Documenting this invariant prevents future "why does the report show subfolder names" regressions.
+  > **How to apply**: Add a `project_root` column to `sessions` populated via `workitem.ResolveProject(input.Project)` at record time; report reads `project_root` directly and only falls back to read-time resolution for pre-migration rows. Normalize in `recorder.RecordPrompt` (recorder.go:34) so the invariant holds at the source.
+
 
 
 

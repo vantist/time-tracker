@@ -12,6 +12,7 @@ import (
 
 	"github.com/user/tt/internal/aggregator"
 	"github.com/user/tt/internal/config"
+	"github.com/user/tt/internal/workitem"
 )
 
 type Options struct {
@@ -189,6 +190,23 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		return Result{Empty: true}, nil
 	}
 
+	// Normalize each row's project to its git root so sessions started in
+	// subfolders collapse into the git-root project for grouping/display.
+	// Cache per unique raw path to avoid repeated `git rev-parse` calls.
+	resolveCache := map[string]string{}
+	for i := range allRows {
+		raw := allRows[i].project
+		if raw == "" {
+			continue
+		}
+		resolved, ok := resolveCache[raw]
+		if !ok {
+			resolved = workitem.ResolveProject(raw)
+			resolveCache[raw] = resolved
+		}
+		allRows[i].resolvedProject = resolved
+	}
+
 	// aggregate
 	var res Result
 	res.SessionsCount = len(sessionSet)
@@ -251,7 +269,7 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		// per-session accumulation
 		ss := sessMap[r.sessionID]
 		if ss == nil {
-			ss = &sessState{project: r.project, branch: r.branch, tool: r.tool, model: r.model, startedAt: r.startedAt, workItem: r.workItem}
+			ss = &sessState{project: r.resolvedProject, branch: r.branch, tool: r.tool, model: r.model, startedAt: r.startedAt, workItem: r.workItem}
 			sessMap[r.sessionID] = ss
 		}
 		ss.turns++
@@ -262,10 +280,10 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 		ss.cacheCreate += r.cacheCreate
 
 		// by-project accumulation
-		ps := projMap[r.project]
+		ps := projMap[r.resolvedProject]
 		if ps == nil {
 			ps = &projState{sessions: map[string]struct{}{}}
-			projMap[r.project] = ps
+			projMap[r.resolvedProject] = ps
 		}
 		ps.sessions[r.sessionID] = struct{}{}
 		ps.turns = append(ps.turns, aggregator.Turn{PromptAt: r.promptAt, ResponseAt: r.responseAt})
@@ -465,9 +483,10 @@ func Query(conn *sql.DB, opts Options) (Result, error) {
 }
 
 type rowData struct {
-	sessionID   string
-	project     string
-	branch      string
+	sessionID       string
+	project         string
+	resolvedProject string
+	branch          string
 	tool        string
 	model       string
 	startedAt   string
@@ -500,17 +519,17 @@ func groupByWorkItem(rows []rowData, sessUserIntervals map[string][]aggregator.I
 	for _, r := range rows {
 		g, seen := sessGroup[r.sessionID]
 		if !seen {
-			label := r.workItem
-			if label == "" {
-				label = r.branch
-			}
-			if label == "" {
-				label = "untagged"
-			}
-			key := groupKey{r.project, label}
-			g = groups[key]
-			if g == nil {
-				g = &groupState{project: r.project, label: label, sessions: map[string]struct{}{}}
+		label := r.workItem
+		if label == "" {
+			label = r.branch
+		}
+		if label == "" {
+			label = "untagged"
+		}
+		key := groupKey{r.resolvedProject, label}
+		g = groups[key]
+		if g == nil {
+			g = &groupState{project: r.resolvedProject, label: label, sessions: map[string]struct{}{}}
 				groups[key] = g
 			}
 			sessGroup[r.sessionID] = g

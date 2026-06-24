@@ -3,6 +3,8 @@ package report_test
 import (
 	"database/sql"
 	"encoding/json"
+	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -712,6 +714,74 @@ func TestGroupByWorkItem_SameWorkItemDifferentProject(t *testing.T) {
 	}
 	if !projects["alpha"] || !projects["beta"] {
 		t.Errorf("expected both alpha and beta in Projects, got: %v", projects)
+	}
+}
+
+// workitem-project-not-git-root: sessions started in a git subfolder must resolve
+// to the git root for both WorkItem grouping and ByProject aggregation. A workitem
+// label is keyed by git root (workitem.ResolveProject), so two sessions sharing a
+// workitem label but stored with different raw cwds (root vs subfolder) must
+// collapse into ONE group whose Project is the git-root basename.
+func TestReportResolvesProjectToGitRoot(t *testing.T) {
+	rawRoot := t.TempDir()
+	root, err := filepath.EvalSymlinks(rawRoot)
+	if err != nil {
+		t.Fatalf("EvalSymlinks: %v", err)
+	}
+	subdir := filepath.Join(root, "src", "backend", "SubApi")
+	if err := os.MkdirAll(subdir, 0o755); err != nil {
+		t.Fatalf("MkdirAll: %v", err)
+	}
+	if err := exec.Command("git", "init", root).Run(); err != nil {
+		t.Skip("git not available")
+	}
+
+	conn := openTestDB(t)
+	now := time.Now().UTC()
+
+	// Two sessions, same workitem, different raw cwds (root vs subfolder).
+	insertSession(t, conn, "root-sess", root, "main", "GSSCHATBOTA-4395")
+	insertSession(t, conn, "sub-sess", subdir, "main", "GSSCHATBOTA-4395")
+
+	ra := now.Add(time.Minute)
+	insertTurn(t, conn, "root-sess", now.Add(-time.Hour), &ra, nil)
+	insertTurn(t, conn, "sub-sess", now.Add(-time.Hour), &ra, nil)
+
+	result, err := report.Query(conn, report.Options{Since: now.Add(-2 * time.Hour), ByWorkItem: true})
+	if err != nil {
+		t.Fatalf("Query: %v", err)
+	}
+
+	wantBase := filepath.Base(root)
+
+	// WorkItem grouping: one group, project == git-root basename.
+	if len(result.Groups) != 1 {
+		t.Fatalf("Groups len = %d, want 1 (subfolder must resolve to git root); got %+v",
+			len(result.Groups), result.Groups)
+	}
+	if g := result.Groups[0]; g.Project != wantBase {
+		t.Errorf("GroupResult.Project = %q, want %q (git root basename)", g.Project, wantBase)
+	}
+	if g := result.Groups[0]; g.SessionsCount != 2 {
+		t.Errorf("GroupResult.SessionsCount = %d, want 2 (both sessions merged)", g.SessionsCount)
+	}
+
+	// ByProject: one entry, project == resolved git-root path.
+	if len(result.ByProject) != 1 {
+		t.Fatalf("ByProject len = %d, want 1; got %+v", len(result.ByProject), result.ByProject)
+	}
+	if p := result.ByProject[0]; p.Project != root {
+		t.Errorf("ByProject.Project = %q, want %q (resolved git root)", p.Project, root)
+	}
+	if p := result.ByProject[0]; p.SessionsCount != 2 {
+		t.Errorf("ByProject.SessionsCount = %d, want 2", p.SessionsCount)
+	}
+
+	// Sessions list: each row's Project is the resolved git root.
+	for _, s := range result.Sessions {
+		if s.Project != root {
+			t.Errorf("SessionRow.Project = %q, want %q (resolved git root)", s.Project, root)
+		}
 	}
 }
 

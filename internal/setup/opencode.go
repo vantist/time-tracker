@@ -1,7 +1,6 @@
 package setup
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -99,9 +98,8 @@ func SetupOpencode() error {
 	pluginDir := filepath.Join(home, ".config", "opencode", "plugins")
 	pluginPath := filepath.Join(pluginDir, "tt-bridge.ts")
 
-	// Check if file already exists (idempotent: skip if present)
+	// Idempotent: skip if already present
 	if _, err := os.Stat(pluginPath); err == nil {
-		fmt.Printf("tt-bridge.ts already exists in %s, skipping\n", pluginDir)
 		return nil
 	}
 
@@ -110,12 +108,7 @@ func SetupOpencode() error {
 		return err
 	}
 
-	if err := os.WriteFile(pluginPath, []byte(opencodePluginTemplate), 0o600); err != nil {
-		return err
-	}
-
-	fmt.Printf("OpenCode plugin configured in %s\n", pluginPath)
-	return nil
+	return os.WriteFile(pluginPath, []byte(opencodePluginTemplate), 0o600)
 }
 
 // IsOpenCodeActive checks if the ~/.config/opencode directory exists.
