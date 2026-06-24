@@ -114,6 +114,13 @@
       }
     }
     ```
+* **OpenCode 整合設定：`~/.config/opencode/plugins/tt-bridge.ts`**
+  - **格式**：TypeScript
+  - **說明**：執行 `tt setup --opencode` 時自動生成此檔案。OpenCode plugin 監聽 `message.updated` 事件，自動呼叫 `tt record prompt/response --tool opencode` 記錄 prompt/response 事件與 token 用量。
+* **VS Code Copilot 整合**：透過 VS Code Extension（`tt-copilot-bridge`）監聽 workspaceStorage 檔案變更，自動呼叫 `tt record prompt/response --tool vscode-copilot`。
+  - **安裝方式**：執行 `tt setup --vscode-copilot` 取得安裝說明
+  - **資料來源**：`~/Library/Application Support/Code/User/workspaceStorage/*/GitHub.copilot-chat/`（macOS）
+  - **Session 檔案格式**：transcripts JSONL、chatSessions JSON、debug-logs JSONL
 
 ---
 

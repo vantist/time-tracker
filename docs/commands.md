@@ -46,7 +46,9 @@ tt record response [flags]
 |------|------|------|
 | `--session string` | Session ID（覆寫 stdin） | `""` |
 | `--tokens string` | Token 用量 JSON 字串（覆寫 stdin） | `""` |
+| `--subagent-tokens string` | Subagent token JSON 陣列（OpenCode event path） | `""` |
 | `--tool string` | 工具名稱 | `"claude-code"` |
+| `--model string` | 模型名稱（覆寫 stdin） | `""` |
 
 **stdin 格式：**
 支援 JSON 物件，可用欄位包括：
@@ -122,6 +124,8 @@ tt setup [flags]
 | `--copilot` | 設定 GitHub Copilot CLI hooks | `false` |
 | `--antigravity` | 設定 Google Antigravity hooks | `false` |
 | `--codex` | 設定 OpenAI Codex hooks | `false` |
+| `--opencode` | 設定 OpenCode plugin | `false` |
+| `--vscode-copilot` | 設定 VS Code Copilot bridge | `false` |
 
 ---
 
