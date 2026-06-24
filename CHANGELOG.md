@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.11.0](https://github.com/vantist/time-tracker/compare/v1.10.0...v1.11.0) (2026-06-24)
+
+
+### Features
+
+* **cmd:** add --model flag to record response and integration test for opencode flow ([bf78b93](https://github.com/vantist/time-tracker/commit/bf78b938f4ef9aa152369cb95a0abcaded4e80d9))
+* **record:** add --subagent-tokens flag to record response ([02ecc0d](https://github.com/vantist/time-tracker/commit/02ecc0db7b2146972a11f103032350b69711e59b))
+* **recorder:** insert subagent usages into turn_model_usages from --subagent-tokens flag ([851df99](https://github.com/vantist/time-tracker/commit/851df9988bf4b32b4adca9aa0650fd4809cb3262))
+* **recorder:** parse --subagent-tokens JSON into ModelUsage list ([8db286c](https://github.com/vantist/time-tracker/commit/8db286cad9d8b3e5183c3ea7ec5de2821a6fad73))
+* **recorder:** store NULL prompt_line_offset when transcript path empty ([569753f](https://github.com/vantist/time-tracker/commit/569753f16da9b14d31d21ad46106c9d2ce1c129a))
+* **record:** opencode skips transcript parser fallback ([fac7c2b](https://github.com/vantist/time-tracker/commit/fac7c2b0f0142f251981955246a95893e6567a2c))
+* **report:** add opencode normalization in normalizeAgentName ([2e5a4f4](https://github.com/vantist/time-tracker/commit/2e5a4f4fa1b8fd01e2b1661b6591b09a43e164cb))
+* **setup:** add --opencode flag to tt setup command ([54d2665](https://github.com/vantist/time-tracker/commit/54d266570b93be439f5b19260b0375aa9feeefdb))
+* **setup:** add --vscode-copilot flag to tt setup command ([9d8a82d](https://github.com/vantist/time-tracker/commit/9d8a82dd8c55a4abee67b32d07b44a488228327b))
+* **setup:** add SetupOpencode and IsOpenCodeActive for opencode plugin ([0cf2bac](https://github.com/vantist/time-tracker/commit/0cf2bac7e637a54a8c166af30b668da7a7e31f41))
+* **transcript:** add chatSessions JSON parser ([befd542](https://github.com/vantist/time-tracker/commit/befd542d037187edee92f085663b526c5073804e))
+* **transcript:** add debug-logs JSONL parser ([99b4659](https://github.com/vantist/time-tracker/commit/99b46592e3336bcd5be2bcf41a4d73f8f82f77ba))
+* **transcript:** add token estimation with multi-level fallback ([a8b7a7e](https://github.com/vantist/time-tracker/commit/a8b7a7e44ef10f5490bdb5f45bffe63b60a63adb))
+* **transcript:** add VS Code Copilot Chat transcript parser ([86586b5](https://github.com/vantist/time-tracker/commit/86586b55529638a922fd142c9e41ac567c8f1a88))
+* **transcript:** add workspaceStorage session discovery ([cc83330](https://github.com/vantist/time-tracker/commit/cc833307701001493c6925c51b9d31e4ae3c64ba))
+* **transcript:** register no-op opencode LogProvider ([78b4042](https://github.com/vantist/time-tracker/commit/78b4042488fc1d40050e9f628e2b4794573a5208))
+* **transcript:** register VSCodeCopilotProvider for vscode-copilot tool ([4fc04cd](https://github.com/vantist/time-tracker/commit/4fc04cde06ce30fdedcf5cf8f91f2176ead61ea7))
+* **vscode-extension:** add TT Copilot Bridge VS Code extension ([b4554ac](https://github.com/vantist/time-tracker/commit/b4554ac2d08270762197026df344450ebf355035))
+
+
+### Bug Fixes
+
+* improve cross-platform VS Code path detection ([60966df](https://github.com/vantist/time-tracker/commit/60966df733f8af06a24e674ba0b0b36c710e9bea))
+* **setup:** detect VS Code Copilot via workspaceStorage data instead of extension directory ([9135a0d](https://github.com/vantist/time-tracker/commit/9135a0de289fc31a09563937d9364fc01512548c))
+
 ## [1.10.0](https://github.com/vantist/time-tracker/compare/v1.9.0...v1.10.0) (2026-06-22)
 
 
